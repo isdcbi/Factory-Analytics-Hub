@@ -1,0 +1,17 @@
+{
+  "dbLine": ["Line 1", "Line 2", "Line 3", "Line 4", "Line 5", "Line 6", "Line 7"],
+  "lineProcessData": {},
+  "dbPCS": [],
+  "orders": {},
+  "capacity": {},
+  "workCalendar": {},
+  "mpParams": {
+    "Line 1": {"std": 2, "loader": 1, "qc": 1},
+    "Line 2": {"std": 2, "loader": 1, "qc": 1},
+    "Line 3": {"std": 2, "loader": 1, "qc": 1},
+    "Line 4": {"std": 2, "loader": 1, "qc": 1},
+    "Line 5": {"std": 2, "loader": 1, "qc": 1},
+    "Line 6": {"std": 2, "loader": 1, "qc": 1},
+    "Line 7": {"std": 2, "loader": 1, "qc": 1}
+  }
+}

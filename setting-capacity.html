@@ -1,0 +1,764 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Setting Kapasitas — Factory Analytics Hub</title>
+  <link rel="stylesheet" href="style.css"/>
+  <style>
+    .cal-day { min-width: 36px; min-height: 36px; font-size: 12px; cursor: pointer; }
+    .cal-day.today { border: 1px solid var(--accent-v); }
+    .cal-day[title]:hover::after { content: attr(title); position: absolute; bottom: 110%; left: 50%; transform: translateX(-50%); background: var(--bg-2); border: 1px solid var(--border); border-radius: 4px; padding: 3px 8px; font-size: 10px; white-space: nowrap; z-index: 10; pointer-events: none; }
+    .summary-chip { display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 6px; background: var(--bg-2); border: 1px solid var(--border-solid2); font-size: 12px; color: var(--text-2); }
+    .summary-chip strong { color: var(--text-1); }
+
+    /* ── Tab Navigation ─────────────────────────────────────────── */
+    .sc-tabs {
+      display: flex;
+      gap: 2px;
+      border-bottom: 2px solid var(--border-solid2);
+      margin-bottom: 20px;
+    }
+    .sc-tab {
+      padding: 8px 18px;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-3);
+      cursor: pointer;
+      border: none;
+      background: none;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -2px;
+      border-radius: 6px 6px 0 0;
+      transition: color var(--transition), background var(--transition), border-color var(--transition);
+      white-space: nowrap;
+    }
+    .sc-tab:hover  { color: var(--text-1); background: var(--bg-2); }
+    .sc-tab.active { color: var(--accent); border-bottom-color: var(--accent); background: rgba(94,106,210,.06); }
+
+    .sc-panel { display: none; }
+    .sc-panel.active { display: block; }
+
+    /* ── Process Capacity Table ─────────────────────────────────── */
+    .pc-std-table { width: 100%; font-size: 13px; }
+    .pc-std-table th { text-align: left; font-weight: 600; padding: 6px 12px; background: var(--bg-2); font-size: 11px; }
+    .pc-std-table td { padding: 7px 12px; border-bottom: 1px solid var(--border); }
+    .pc-std-table tr:last-child td { border-bottom: none; }
+    .sum-input { width: 100%; border: 1px solid transparent; background: transparent; padding: 2px 4px; border-radius: 4px; font-size: 13px; text-align: right; font-weight: 600; }
+    .sum-input:focus { outline: none; border-color: var(--accent); background: #fff; }
+
+    .pc-table { font-size: 12px; table-layout: auto; width: 100%; min-width: 700px; }
+    .pc-table th { font-size: 11px; font-weight: 600; background: var(--bg-2); padding: 7px 10px; text-align: center; white-space: nowrap; position: sticky; top: 0; z-index: 2; }
+    .pc-table th:nth-child(2), .pc-table th:nth-child(3) { text-align: left; }
+    .pc-table td { padding: 5px 6px; border-bottom: 1px solid var(--border); text-align: center; }
+    .pc-table td:nth-child(2), .pc-table td:nth-child(3) { text-align: left; }
+    .pc-table td.pc-calc { background: #f0fdf4; color: #15803d; font-weight: 600; }
+    .pc-table input[type=text], .pc-table input[type=number] {
+      width: 100%; border: 1px solid transparent; background: transparent; padding: 3px 6px;
+      border-radius: 4px; font-size: 12px; text-align: inherit;
+    }
+    .pc-table input[type=number] { text-align: right; }
+    .pc-table input:focus { outline: none; border-color: var(--accent); background: #fff; }
+    .pc-table .btn-del { background: none; border: none; color: var(--text-4); cursor: pointer; padding: 2px 6px; border-radius: 4px; font-size: 14px; }
+    .pc-table .btn-del:hover { color: #dc2626; background: #fff1f1; }
+  </style>
+</head>
+<body>
+<div class="app-layout">
+  <div id="sidebarMount"></div>
+  <div class="main-content">
+    <div id="topbarMount"></div>
+    <div class="page-body">
+
+      <!-- Period Selector (global, always visible) -->
+      <div class="flex items-center gap-3 mb-4 flex-wrap">
+        <div class="period-bar" style="margin-bottom:0">
+          <span class="period-label">Periode:</span>
+          <select id="periodSelect" class="form-control" style="width:auto">
+            <option value="">— Pilih Periode —</option>
+          </select>
+          <input type="month" id="newPeriodInput" class="form-control" style="width:170px"/>
+          <button class="btn btn-ghost btn-sm" id="addPeriodBtn">+ Tambah</button>
+        </div>
+        <button class="btn btn-primary btn-sm ml-auto" id="saveBtn">Simpan Pengaturan</button>
+      </div>
+
+      <!-- Tab Navigation -->
+      <nav class="sc-tabs" id="scTabs">
+        <button class="sc-tab active" data-tab="workday">Workday & Shift</button>
+        <button class="sc-tab"        data-tab="capacity">Process Capacity</button>
+      </nav>
+
+      <!-- ── Panel: Workday & Shift ────────────────────────────── -->
+      <div class="sc-panel active" id="panel-workday">
+        <div id="mainContent" style="display:none">
+          <!-- Summary chips -->
+          <div id="summaryChips" class="flex gap-3 mb-6 flex-wrap"></div>
+
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px">
+
+            <!-- Calendar -->
+            <div class="card">
+              <div class="card-header" style="margin-bottom:12px">
+                <span class="card-title">Kalender Kerja</span>
+                <div class="flex gap-2">
+                  <button class="btn btn-ghost btn-xs" id="prevMonth">‹</button>
+                  <span id="calTitle" style="font-size:13px;color:var(--text-2);min-width:100px;text-align:center"></span>
+                  <button class="btn btn-ghost btn-xs" id="nextMonth">›</button>
+                </div>
+              </div>
+              <div class="flex gap-3 mb-3 text-sm" style="font-size:11px;color:var(--text-4)">
+                <span style="display:flex;align-items:center;gap:4px"><span style="width:10px;height:10px;border-radius:2px;background:rgba(39,166,68,0.2);border:1px solid rgba(39,166,68,0.4);display:inline-block"></span> ON</span>
+                <span style="display:flex;align-items:center;gap:4px"><span style="width:10px;height:10px;border-radius:2px;background:var(--bg-2);border:1px solid var(--border-solid2);display:inline-block"></span> OFF</span>
+                <span style="display:flex;align-items:center;gap:4px"><span style="width:10px;height:10px;border-radius:2px;background:rgba(224,52,52,0.1);display:inline-block"></span> Libur</span>
+              </div>
+              <div id="calendarGrid" class="calendar-grid"></div>
+              <div class="flex gap-2 mt-3">
+                <button class="btn btn-ghost btn-xs" onclick="setAllWeekdays(true)">Aktifkan Weekday</button>
+                <button class="btn btn-ghost btn-xs" onclick="setAllWeekdays(false)">Nonaktifkan Semua</button>
+              </div>
+            </div>
+
+            <!-- Shift Config -->
+            <div>
+              <div class="card">
+                <div class="card-header"><span class="card-title">Konfigurasi Shift</span></div>
+                <p class="text-sm text-muted mb-3" style="margin-top:-8px">Centang shift yang aktif per LINE · S1=435 mnt, S2=405 mnt, S3=370 mnt</p>
+                <table class="shift-table" id="shiftTable">
+                  <thead>
+                    <tr>
+                      <th style="text-align:left">LINE</th>
+                      <th>S1</th><th>S2</th><th>S3</th>
+                      <th style="text-align:left">Kapasitas/Hari</th>
+                    </tr>
+                  </thead>
+                  <tbody id="shiftBody"></tbody>
+                </table>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <div id="noPeriod" class="empty-state">
+          <div class="empty-icon">📅</div>
+          <div class="empty-title">Pilih atau buat periode</div>
+          <div class="empty-text">Gunakan selector di atas untuk memilih periode yang ingin dikonfigurasi</div>
+        </div>
+      </div>
+
+      <!-- ── Panel: Process Capacity ──────────────────────────── -->
+      <div class="sc-panel" id="panel-capacity">
+
+        <!-- Top row: Standar + Summary side by side -->
+        <div style="display:flex;gap:20px;align-items:flex-start;margin-bottom:24px;flex-wrap:wrap">
+
+          <!-- Standar Waktu Kerja Efektif -->
+          <div class="card" style="min-width:260px">
+            <div class="card-header"><span class="card-title">Standar Waktu Kerja Efektif</span></div>
+            <table class="pc-std-table">
+              <thead>
+                <tr><th>Shift</th><th>Waktu Efektif</th></tr>
+              </thead>
+              <tbody>
+                <tr><td>Shift 1</td><td><strong>435 menit</strong></td></tr>
+                <tr><td>Shift 2</td><td><strong>405 menit</strong></td></tr>
+                <tr><td>Shift 3</td><td><strong>370 menit</strong></td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Summary -->
+          <div class="card" style="min-width:360px">
+            <div class="card-header"><span class="card-title">Summary</span></div>
+            <table class="pc-std-table" id="summaryTable">
+              <thead>
+                <tr><th>Parameter</th><th>Unit</th><th style="text-align:right">Value</th></tr>
+              </thead>
+              <tbody>
+                <tr><td>Plate/battery</td><td>panel</td><td><input type="number" id="sum-platePerBattery" class="sum-input" placeholder="—" readonly style="color:var(--accent);cursor:default" title="Auto-kalkulasi dari Generated Data Order"></td></tr>
+                <tr><td>Berat lead/battery</td><td>kg</td><td><input type="number" id="sum-beratLeadBattery" class="sum-input" placeholder="—" readonly style="color:var(--accent);cursor:default" title="Auto-kalkulasi dari Generated Data Order"></td></tr>
+                <tr><td>Berat lead/panel</td><td>kg</td><td><input type="number" id="sum-beratLeadPanel" class="sum-input" placeholder="—" readonly style="color:var(--accent);cursor:default" title="Auto-kalkulasi dari Generated Data Order"></td></tr>
+                <tr><td>Qty Order Battery</td><td>pcs</td><td><input type="number" id="sum-qtyOrderBattery" class="sum-input" placeholder="—" readonly style="color:var(--accent);cursor:default" title="Auto-kalkulasi dari Generated Data Order"></td></tr>
+                <tr><td>Hari Kerja Normal</td><td></td><td><input type="number" id="sum-hariKerjaNormal" class="sum-input" placeholder="—" readonly style="color:var(--accent);cursor:default" title="Jumlah hari ON dari Kalender Kerja periode aktif"></td></tr>
+              </tbody>
+            </table>
+          </div>
+
+        </div>
+
+        <!-- Process Capacity -->
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">Process Capacity</span>
+            <button class="btn btn-ghost btn-sm" onclick="addPCRow()">+ Tambah Baris</button>
+          </div>
+          <div class="table-wrap">
+            <div class="table-scroll">
+              <table class="pc-table" id="pcTable">
+                <thead>
+                  <tr>
+                    <th rowspan="2" style="width:32px">#</th>
+                    <th rowspan="2">Process</th>
+                    <th rowspan="2">Unit</th>
+                    <th rowspan="2">Speed</th>
+                    <th rowspan="2">Efficiency (%)</th>
+                    <th colspan="3" style="text-align:center;background:#e9ebf8">Kapasitas/Shift</th>
+                    <th colspan="3" style="text-align:center;background:#e6f4ec">Qty Machine</th>
+                    <th rowspan="2" style="background:#fef9c3;color:#854d0e">Capacity/day</th>
+                    <th rowspan="2" style="width:40px"></th>
+                  </tr>
+                  <tr>
+                    <th style="background:#e9ebf8">Shift 1</th>
+                    <th style="background:#e9ebf8">Shift 2</th>
+                    <th style="background:#e9ebf8">Shift 3</th>
+                    <th style="background:#e6f4ec">Shift 1</th>
+                    <th style="background:#e6f4ec">Shift 2</th>
+                    <th style="background:#e6f4ec">Shift 3</th>
+                  </tr>
+                </thead>
+                <tbody id="pcBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script src="shared-components.js"></script>
+<script>
+let currentPeriod = '';
+let calYear = 0, calMonth = 0;
+
+const HOLIDAYS = BPMS.HOLIDAYS_2026;
+
+const ALL_LINES = [
+  'Grid Casting','Grid Punching','Ball Mill','Mixing',
+  'Pasting Casting','Pasting Punching','Formation',
+  'Line 1','Line 2','Line 3','Line 4','Line 5','Line 6','Line 7',
+  'Line MCB','Line IB','Line Lithium','Line Charger','Wet A','Wet F',
+];
+
+// ── Tab Navigation ────────────────────────────────────────────────
+
+document.getElementById('scTabs').addEventListener('click', e => {
+  const btn = e.target.closest('.sc-tab');
+  if (!btn) return;
+  document.querySelectorAll('.sc-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.sc-panel').forEach(p => p.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('panel-' + btn.dataset.tab).classList.add('active');
+});
+
+// ── Init ──────────────────────────────────────────────────────────
+
+function pageInit() {
+  document.getElementById('topbarMount').innerHTML = BPMS.renderTopbar('Setting Kapasitas');
+  populatePeriods();
+
+  const sel = document.getElementById('periodSelect');
+  sel.addEventListener('change', () => { currentPeriod = sel.value; loadPeriod(); });
+
+  document.getElementById('addPeriodBtn').addEventListener('click', addPeriod);
+  document.getElementById('saveBtn').addEventListener('click', savePeriod);
+  document.getElementById('prevMonth').addEventListener('click', () => { if (calMonth === 1) { calMonth = 12; calYear--; } else calMonth--; renderCalendar(); });
+  document.getElementById('nextMonth').addEventListener('click', () => { if (calMonth === 12) { calMonth = 1; calYear++; } else calMonth++; renderCalendar(); });
+
+  const current = BPMS.getCurrentPeriod();
+  if (BPMS.getPeriods().includes(current)) { sel.value = current; currentPeriod = current; loadPeriod(); }
+
+  syncProcessCapacity();
+  renderPCTable();
+  loadSummary();
+}
+
+function populatePeriods() {
+  const sel  = document.getElementById('periodSelect');
+  const prev = sel.value;
+  sel.innerHTML = '<option value="">— Pilih Periode —</option>';
+  BPMS.getPeriods().forEach(p => {
+    const opt = document.createElement('option');
+    opt.value       = p;
+    opt.textContent = BPMS.formatPeriod(p) + ' (' + p + ')';
+    sel.appendChild(opt);
+  });
+  if (prev) sel.value = prev;
+}
+
+function addPeriod() {
+  const val = document.getElementById('newPeriodInput').value;
+  if (!val) { BPMS.toast('Pilih bulan terlebih dahulu', 'error'); return; }
+  const state = BPMS.getState();
+  if (!state.orders[val])       state.orders[val] = [];
+  BPMS.initCalendarForPeriod(val);
+  BPMS.initCapacityForPeriod(val);
+  BPMS.saveState();
+  populatePeriods();
+  document.getElementById('periodSelect').value = val;
+  currentPeriod = val;
+  loadPeriod();
+  BPMS.toast('Periode ' + BPMS.formatPeriod(val) + ' dibuat', 'success');
+}
+
+function loadPeriod() {
+  if (!currentPeriod) {
+    document.getElementById('mainContent').style.display = 'none';
+    document.getElementById('noPeriod').style.display = '';
+    return;
+  }
+  const state = BPMS.getState();
+  BPMS.initCalendarForPeriod(currentPeriod);
+  BPMS.initCapacityForPeriod(currentPeriod);
+
+  const [y, m] = currentPeriod.split('-').map(Number);
+  calYear = y; calMonth = m;
+
+  document.getElementById('mainContent').style.display = '';
+  document.getElementById('noPeriod').style.display = 'none';
+  renderCalendar();
+  renderShiftTable();
+  updateSummaryChips();
+  loadSummary();
+}
+
+// ── Calendar ──────────────────────────────────────────────────────
+
+function renderCalendar() {
+  const state    = BPMS.getState();
+  const cal      = state.workCalendar?.[currentPeriod] || {};
+  const daysInM  = new Date(calYear, calMonth, 0).getDate();
+  const firstDow = new Date(calYear, calMonth - 1, 1).getDay();
+  const start    = (firstDow + 6) % 7;
+
+  const months = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+  document.getElementById('calTitle').textContent = months[calMonth - 1] + ' ' + calYear;
+
+  let html = '';
+  ['Sen','Sel','Rab','Kam','Jum','Sab','Min'].forEach(d => { html += `<div class="cal-day-header">${d}</div>`; });
+  for (let i = 0; i < start; i++) html += '<div class="cal-day empty"></div>';
+
+  const today  = new Date();
+  const todayS = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+
+  for (let d = 1; d <= daysInM; d++) {
+    const ds  = `${calYear}-${String(calMonth).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const dow = new Date(calYear, calMonth - 1, d).getDay();
+    const holiday = HOLIDAYS[ds];
+    const isOn    = cal[ds] === true;
+
+    let cls = 'cal-day';
+    let title = '';
+    if (holiday)       { cls += ' holiday'; title = holiday; }
+    else if (isOn)       cls += ' work-on';
+    else                 cls += ' work-off';
+    if (ds === todayS)   cls += ' today';
+
+    html += `<div class="${cls}" data-date="${ds}" onclick="toggleDay('${ds}')" ${title ? `title="${title}"` : ''}>${d}</div>`;
+  }
+
+  document.getElementById('calendarGrid').innerHTML = html;
+  updateSummaryChips();
+}
+
+function toggleDay(ds) {
+  const state = BPMS.getState();
+  if (!state.workCalendar[currentPeriod]) state.workCalendar[currentPeriod] = {};
+  state.workCalendar[currentPeriod][ds] = !state.workCalendar[currentPeriod][ds];
+  renderCalendar();
+}
+
+function setAllWeekdays(on) {
+  const state   = BPMS.getState();
+  const cal     = state.workCalendar[currentPeriod] || {};
+  const daysInM = new Date(calYear, calMonth, 0).getDate();
+  for (let d = 1; d <= daysInM; d++) {
+    const ds      = `${calYear}-${String(calMonth).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const dow     = new Date(calYear, calMonth - 1, d).getDay();
+    const holiday = HOLIDAYS[ds];
+    if (on) cal[ds] = (dow !== 0 && dow !== 6) && !holiday;
+    else    cal[ds] = false;
+  }
+  state.workCalendar[currentPeriod] = cal;
+  renderCalendar();
+}
+
+// ── Shift Table ───────────────────────────────────────────────────
+
+function renderShiftTable() {
+  const state = BPMS.getState();
+  const lines = ALL_LINES;
+  const cap   = state.capacity?.[currentPeriod] || {};
+
+  const shiftCell = (line, shift, checked) => `
+    <td style="text-align:center">
+      <div style="display:inline-flex;align-items:center;gap:6px">
+        <label class="toggle"><input type="checkbox" ${checked ? 'checked' : ''} onchange="updateShift('${line}','${shift}',this.checked)"><span class="toggle-slider"></span></label>
+        <span id="lbl-${line.replace(/ /g,'_')}-${shift}" style="font-size:11px;font-weight:600;min-width:24px;color:${checked ? 'var(--accent)' : 'var(--text-4)'}">${checked ? 'ON' : 'OFF'}</span>
+      </div>
+    </td>`;
+
+  document.getElementById('shiftBody').innerHTML = lines.map(line => {
+    const cfg = cap[line] || (line === 'Formation' ? { s1: true, s2: false, s3: false } : { s1: true, s2: true, s3: true });
+    const mins = (cfg.s1 ? 435 : 0) + (cfg.s2 ? 405 : 0) + (cfg.s3 ? 370 : 0);
+    const hrs  = (mins / 60).toFixed(1);
+    return `<tr>
+      <td style="text-align:left"><strong>${line}</strong></td>
+      ${shiftCell(line,'s1',cfg.s1)}
+      ${shiftCell(line,'s2',cfg.s2)}
+      ${shiftCell(line,'s3',cfg.s3)}
+      <td style="text-align:left;font-size:12px" id="capCell-${line.replace(/ /g,'_')}">${hrs} jam/hari · ${mins} mnt</td>
+    </tr>`;
+  }).join('');
+}
+
+function updateShift(line, shift, val) {
+  const state = BPMS.getState();
+  if (!state.capacity[currentPeriod]) state.capacity[currentPeriod] = {};
+  if (!state.capacity[currentPeriod][line]) state.capacity[currentPeriod][line] = { s1: true, s2: true, s3: false };
+  state.capacity[currentPeriod][line][shift] = val;
+
+  const cfg  = state.capacity[currentPeriod][line];
+  const mins = (cfg.s1 ? 435 : 0) + (cfg.s2 ? 405 : 0) + (cfg.s3 ? 370 : 0);
+  const key  = line.replace(/ /g, '_');
+  const cell = document.getElementById('capCell-' + key);
+  if (cell) cell.textContent = (mins / 60).toFixed(1) + ' jam/hari · ' + mins + ' mnt';
+
+  const lbl = document.getElementById(`lbl-${key}-${shift}`);
+  if (lbl) { lbl.textContent = val ? 'ON' : 'OFF'; lbl.style.color = val ? 'var(--accent)' : 'var(--text-4)'; }
+  updateSummaryChips();
+}
+
+function updateSummaryChips() {
+  const workDays    = BPMS.getWorkDayCount(currentPeriod);
+  const state       = BPMS.getState();
+  const lines       = ALL_LINES;
+  const capHrsAll   = lines.map(l => BPMS.getCapacityHours(currentPeriod, l));
+  const totalCapHrs = capHrsAll.reduce((a, b) => a + b, 0);
+
+  document.getElementById('summaryChips').innerHTML = `
+    <div class="summary-chip">Hari Kerja: <strong>${workDays} hari</strong></div>
+    <div class="summary-chip">Total Kapasitas: <strong>${totalCapHrs.toFixed(1)} jam</strong></div>
+    <div class="summary-chip">Rata-rata / LINE: <strong>${lines.length ? (totalCapHrs / lines.length).toFixed(1) : 0} jam</strong></div>`;
+}
+
+// ── Summary ───────────────────────────────────────────────────────
+
+const SUMMARY_FIELDS = ['beratLeadBattery','beratLeadPanel','qtyOrderBattery','hariKerjaNormal'];
+
+function findColKey(rowSample, ...patterns) {
+  const keys = Object.keys(rowSample);
+  for (const pat of patterns) {
+    const k = keys.find(k => k.trim().toLowerCase() === pat.toLowerCase());
+    if (k) return k;
+  }
+  for (const pat of patterns) {
+    const k = keys.find(k => k.trim().toLowerCase().includes(pat.toLowerCase()));
+    if (k) return k;
+  }
+  return null;
+}
+
+function buildSummaryMaps() {
+  const state = BPMS.getState();
+
+  // plateMap: itemDataInfor → { pnPos, qtyPos, pnNeg, qtyNeg }
+  const plateMap  = new Map();
+  const plateRows = state.dbPlateInfor || [];
+  if (plateRows.length) {
+    const s    = plateRows[0];
+    const vals = Object.keys(s);
+    const kKey = findColKey(s, 'Item Data Infor', 'ItemDataInfor') || vals[1];
+    const kPnP = findColKey(s, 'PN Plate Positif', 'PN Positif')   || vals[2];
+    const kQtP = findColKey(s, 'Qty Plate Positif', 'Qty Positif') || vals[3];
+    const kPnN = findColKey(s, 'PN Plate Negatif', 'PN Negatif')   || vals[4];
+    const kQtN = findColKey(s, 'Qty Plate Negatif', 'Qty Negatif') || vals[5];
+    plateRows.forEach(row => {
+      const key = String(row[kKey] ?? '').trim();
+      if (key) plateMap.set(key, {
+        pnPos : String(row[kPnP] ?? ''),
+        qtyPos: Number(row[kQtP]) || 0,
+        pnNeg : String(row[kPnN] ?? ''),
+        qtyNeg: Number(row[kQtN]) || 0,
+      });
+    });
+  }
+
+  // puLeMap: puleKey(pn) → ratio (Qty Pule/Plate kg)
+  const puLeMap  = new Map();
+  const puLeRows = state.dbPuLe || [];
+  if (puLeRows.length) {
+    const s      = puLeRows[0];
+    const vals   = Object.keys(s);
+    const kPN    = findColKey(s, 'PN Plate Infor', 'PN Plate', 'PN') || vals[2];
+    const kRatio = findColKey(s, 'Qty Pule/Plate (kg)', 'Qty Pule/Plate', 'Qty Pule') || vals[4];
+    puLeRows.forEach(row => {
+      const key = String(row[kPN] ?? '').trim();
+      if (key) puLeMap.set(key, Number(row[kRatio]) || 0);
+    });
+  }
+
+  return { plateMap, puLeMap };
+}
+
+function puleKey(pn) {
+  return pn.charAt(2) === 'F' ? 'W-UNPL-' + pn.substring(7) : pn;
+}
+
+function calcPlatePerBattery() {
+  const state = BPMS.getState();
+  const { plateMap } = buildSummaryMaps();
+  if (!plateMap.size) return null;
+
+  let totalQpPos = 0, totalQpNeg = 0, totalQty = 0;
+  Object.values(state.orders || {}).forEach(rows => {
+    (rows || []).forEach(r => {
+      const qty = Number(r.qty) || 0;
+      const pv  = plateMap.get((r.item || '').substring(2, 19));
+      if (pv) { totalQpPos += pv.qtyPos * qty; totalQpNeg += pv.qtyNeg * qty; }
+      totalQty += qty;
+    });
+  });
+
+  return totalQty > 0 ? (totalQpPos + totalQpNeg) / totalQty : null;
+}
+
+function calcPuleTotals() {
+  if (!currentPeriod) return null;
+  const state = BPMS.getState();
+  const { plateMap, puLeMap } = buildSummaryMaps();
+  if (!plateMap.size) return null;
+
+  let totalQpPos = 0, totalQpNeg = 0, totalQPulePos = 0, totalQPuleNeg = 0, totalQty = 0;
+  (state.orders?.[currentPeriod] || []).forEach(r => {
+    const qty = Number(r.qty) || 0;
+    const pv  = plateMap.get((r.item || '').substring(2, 19));
+    if (pv) {
+      const qpPos    = pv.qtyPos * qty;
+      const qpNeg    = pv.qtyNeg * qty;
+      totalQpPos    += qpPos;
+      totalQpNeg    += qpNeg;
+      totalQPulePos += (puLeMap.get(puleKey(pv.pnPos)) || 0) * qpPos;
+      totalQPuleNeg += (puLeMap.get(puleKey(pv.pnNeg)) || 0) * qpNeg;
+    }
+    totalQty += qty;
+  });
+
+  return { totalQpPos, totalQpNeg, totalQPulePos, totalQPuleNeg, totalQty };
+}
+
+function calcBeratLeadBattery() {
+  const t = calcPuleTotals();
+  if (!t || t.totalQty === 0) return null;
+  return (t.totalQPulePos + t.totalQPuleNeg) / t.totalQty;
+}
+
+function calcBeratLeadPanel() {
+  const t = calcPuleTotals();
+  if (!t) return null;
+  const totalPlate = t.totalQpPos + t.totalQpNeg;
+  return totalPlate > 0 ? (t.totalQPulePos + t.totalQPuleNeg) / totalPlate : null;
+}
+
+function calcQtyOrderBattery() {
+  if (!currentPeriod) return null;
+  const orders = BPMS.getState().orders?.[currentPeriod] || [];
+  const total  = orders.reduce((s, r) => s + (Number(r.qty) || 0), 0);
+  return total > 0 ? total : null;
+}
+
+function calcHariKerjaNormal() {
+  if (!currentPeriod) return null;
+  const days = BPMS.getWorkDayCount(currentPeriod);
+  return days > 0 ? days : null;
+}
+
+function loadSummary() {
+  const s = BPMS.getState().capacitySummary || {};
+  SUMMARY_FIELDS.forEach(f => {
+    const el = document.getElementById('sum-' + f);
+    if (el && s[f] !== undefined) el.value = s[f];
+  });
+
+  // Auto-calculate Plate/battery
+  const ppb = calcPlatePerBattery();
+  const elPpb = document.getElementById('sum-platePerBattery');
+  if (elPpb) elPpb.value = ppb !== null ? ppb.toFixed(3) : '';
+
+  // Auto-calculate Berat lead/battery
+  const blb = calcBeratLeadBattery();
+  const elBlb = document.getElementById('sum-beratLeadBattery');
+  if (elBlb) elBlb.value = blb !== null ? blb.toFixed(3) : '';
+
+  // Auto-calculate Berat lead/panel
+  const blp = calcBeratLeadPanel();
+  const elBlp = document.getElementById('sum-beratLeadPanel');
+  if (elBlp) elBlp.value = blp !== null ? blp.toFixed(3) : '';
+
+  // Auto-calculate Qty Order Battery
+  const qob = calcQtyOrderBattery();
+  const elQob = document.getElementById('sum-qtyOrderBattery');
+  if (elQob) elQob.value = qob !== null ? qob.toLocaleString('id-ID') : '';
+
+  // Auto-calculate Hari Kerja Normal
+  const hkn = calcHariKerjaNormal();
+  const elHkn = document.getElementById('sum-hariKerjaNormal');
+  if (elHkn) elHkn.value = hkn !== null ? hkn : '';
+}
+
+function updateSummary(field, value) {
+  const state = BPMS.getState();
+  if (!state.capacitySummary) state.capacitySummary = {};
+  state.capacitySummary[field] = value;
+}
+
+// ── Process Capacity ──────────────────────────────────────────────
+
+function syncProcessCapacity() {
+  const state = BPMS.getState();
+  if (!state.processCapacity) state.processCapacity = [];
+
+  // Build lookup map from existing data
+  const existingMap = new Map(state.processCapacity.map(r => [r.process, r]));
+
+  // Migrate qty fields for existing rows
+  existingMap.forEach(r => {
+    if (r.qtyS1 === undefined) r.qtyS1 = '';
+    if (r.qtyS2 === undefined) r.qtyS2 = '';
+    if (r.qtyS3 === undefined) r.qtyS3 = '';
+  });
+
+  // Rebuild in ALL_LINES order, preserving existing data
+  const synced = ALL_LINES.map(line =>
+    existingMap.get(line) || { process: line, unit: '', speed: '', efficiency: '', qtyS1: '', qtyS2: '', qtyS3: '' }
+  );
+
+  // Append custom rows not in ALL_LINES (user-added)
+  state.processCapacity.forEach(r => {
+    if (!ALL_LINES.includes(r.process)) synced.push(r);
+  });
+
+  state.processCapacity = synced;
+}
+
+const SHIFT_MINS = { s1: 435, s2: 405, s3: 370 };
+
+function renderPCTable() {
+  const rows = BPMS.getState().processCapacity || [];
+  const body = document.getElementById('pcBody');
+  if (!rows.length) {
+    body.innerHTML = `<tr><td colspan="13" class="text-center text-muted" style="padding:28px">Belum ada data — klik "+ Tambah Baris"</td></tr>`;
+    return;
+  }
+  body.innerHTML = rows.map((r, i) => renderPCRow(r, i)).join('');
+}
+
+function renderPCRow(r, i) {
+  const capShift = (speed, eff, mins) => (Number(speed) || 0) * ((Number(eff) || 0) / 100) * mins;
+  const fmt      = v => v > 0 ? Math.round(v).toLocaleString('id-ID') : '—';
+
+  const c1 = capShift(r.speed, r.efficiency, SHIFT_MINS.s1);
+  const c2 = capShift(r.speed, r.efficiency, SHIFT_MINS.s2);
+  const c3 = capShift(r.speed, r.efficiency, SHIFT_MINS.s3);
+  const cap = c1 * (Number(r.qtyS1) || 0)
+            + c2 * (Number(r.qtyS2) || 0)
+            + c3 * (Number(r.qtyS3) || 0);
+
+  return `<tr id="pcrow-${i}">
+    <td class="text-muted" style="font-size:11px">${i + 1}</td>
+    <td><input type="text"   value="${r.process    || ''}" placeholder="Nama proses" onchange="updatePC(${i},'process',this.value)"></td>
+    <td><input type="text"   value="${r.unit       || ''}" placeholder="Unit"        onchange="updatePC(${i},'unit',this.value)" style="width:72px"></td>
+    <td><input type="number" value="${r.speed      || ''}" placeholder="0"           onchange="updatePC(${i},'speed',this.value)" min="0" step="any"></td>
+    <td><input type="number" value="${r.efficiency || ''}" placeholder="0"           onchange="updatePC(${i},'efficiency',this.value)" min="0" max="100" step="any"></td>
+    <td class="pc-calc" style="background:#e9ebf8">${fmt(c1)}</td>
+    <td class="pc-calc" style="background:#e9ebf8">${fmt(c2)}</td>
+    <td class="pc-calc" style="background:#e9ebf8">${fmt(c3)}</td>
+    <td style="background:#f0fdf4"><input type="number" value="${r.qtyS1 || ''}" placeholder="0" onchange="updatePC(${i},'qtyS1',this.value)" min="0" step="1" style="width:56px;text-align:right"></td>
+    <td style="background:#f0fdf4"><input type="number" value="${r.qtyS2 || ''}" placeholder="0" onchange="updatePC(${i},'qtyS2',this.value)" min="0" step="1" style="width:56px;text-align:right"></td>
+    <td style="background:#f0fdf4"><input type="number" value="${r.qtyS3 || ''}" placeholder="0" onchange="updatePC(${i},'qtyS3',this.value)" min="0" step="1" style="width:56px;text-align:right"></td>
+    <td class="pc-capacity" style="background:#fef9c3;font-weight:700;color:#854d0e">${cap > 0 ? Math.round(cap).toLocaleString('id-ID') : '—'}</td>
+    <td><button class="btn-del" onclick="deletePCRow(${i})" title="Hapus">✕</button></td>
+  </tr>`;
+}
+
+function updatePC(i, field, value) {
+  const state = BPMS.getState();
+  if (!state.processCapacity) state.processCapacity = [];
+  state.processCapacity[i][field] = value;
+
+  const r   = state.processCapacity[i];
+  const fmt = v => v > 0 ? Math.round(v).toLocaleString('id-ID') : '—';
+  const capShift = (mins) => (Number(r.speed) || 0) * ((Number(r.efficiency) || 0) / 100) * mins;
+
+  const c1 = capShift(SHIFT_MINS.s1);
+  const c2 = capShift(SHIFT_MINS.s2);
+  const c3 = capShift(SHIFT_MINS.s3);
+  const cap = c1 * (Number(r.qtyS1) || 0)
+            + c2 * (Number(r.qtyS2) || 0)
+            + c3 * (Number(r.qtyS3) || 0);
+
+  const row = document.getElementById('pcrow-' + i);
+  if (row) {
+    const calcCells = row.querySelectorAll('.pc-calc');
+    calcCells[0].textContent = fmt(c1);
+    calcCells[1].textContent = fmt(c2);
+    calcCells[2].textContent = fmt(c3);
+    const capCell = row.querySelector('.pc-capacity');
+    if (capCell) capCell.textContent = cap > 0 ? Math.round(cap).toLocaleString('id-ID') : '—';
+  }
+}
+
+function addPCRow() {
+  const state = BPMS.getState();
+  if (!state.processCapacity) state.processCapacity = [];
+  state.processCapacity.push({ process: '', unit: '', speed: '', efficiency: '', qtyS1: '', qtyS2: '', qtyS3: '' });
+  renderPCTable();
+  // Focus new row's first input
+  const rows = document.querySelectorAll('#pcBody tr');
+  const last = rows[rows.length - 1];
+  if (last) last.querySelector('input')?.focus();
+}
+
+function deletePCRow(i) {
+  const state = BPMS.getState();
+  state.processCapacity.splice(i, 1);
+  renderPCTable();
+}
+
+async function savePeriod() {
+  const state = BPMS.getState();
+
+  // Sync Summary inputs (plate/battery is auto-calc, skip)
+  if (!state.capacitySummary) state.capacitySummary = {};
+  SUMMARY_FIELDS.forEach(f => {
+    const el = document.getElementById('sum-' + f);
+    if (el) state.capacitySummary[f] = el.value;
+  });
+  state.capacitySummary.platePerBattery   = calcPlatePerBattery()   ?? '';
+  state.capacitySummary.beratLeadBattery  = calcBeratLeadBattery()  ?? '';
+  state.capacitySummary.beratLeadPanel    = calcBeratLeadPanel()    ?? '';
+  state.capacitySummary.qtyOrderBattery  = calcQtyOrderBattery()   ?? '';
+  state.capacitySummary.hariKerjaNormal  = calcHariKerjaNormal()   ?? '';
+  if (state.processCapacity) {
+    document.querySelectorAll('#pcBody tr[id^="pcrow-"]').forEach((row, i) => {
+      const inputs = row.querySelectorAll('input');
+      if (inputs[0]) state.processCapacity[i].process    = inputs[0].value;
+      if (inputs[1]) state.processCapacity[i].unit       = inputs[1].value;
+      if (inputs[2]) state.processCapacity[i].speed      = inputs[2].value;
+      if (inputs[3]) state.processCapacity[i].efficiency = inputs[3].value;
+      if (inputs[4]) state.processCapacity[i].qtyS1      = inputs[4].value;
+      if (inputs[5]) state.processCapacity[i].qtyS2      = inputs[5].value;
+      if (inputs[6]) state.processCapacity[i].qtyS3      = inputs[6].value;
+    });
+  }
+  BPMS.showLoading();
+  const ok = await BPMS.saveState();
+  BPMS.hideLoading();
+  BPMS.toast(ok ? 'Pengaturan disimpan' : 'Tersimpan lokal (server offline)', ok ? 'success' : 'info');
+}
+</script>
+</body>
+</html>

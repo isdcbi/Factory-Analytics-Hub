@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Man Power — Factory Analytics Hub</title>
+  <link rel="stylesheet" href="style.css"/>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <style>
+    /* ── MP Group Tables ──────────────────────────────────────────── */
+    .mp-group-wrap {
+      border: 1px solid #c5cad5;
+      border-radius: 6px;
+      overflow: hidden;
+    }
+    .mp-group-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+    }
+    .mp-group-table th,
+    .mp-group-table td {
+      border: 1px solid #c5cad5;
+      padding: 5px 10px;
+      white-space: nowrap;
+    }
+    /* Group title row */
+    .mp-group-table .mp-group-hdr td {
+      background: #b8c8de;
+      font-weight: 600;
+      font-size: 12px;
+      color: #1a2744;
+      padding: 6px 10px;
+      border-color: #9aaec8;
+    }
+    .mp-group-hdr-inner {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .mp-group-hdr-total {
+      font-weight: 400;
+      font-size: 11px;
+      color: #2c3f6a;
+    }
+    .mp-group-hdr-total strong {
+      font-size: 13px;
+      font-weight: 700;
+      color: #1a2744;
+    }
+    /* Sub-header row */
+    .mp-group-table .mp-subhdr th {
+      background: #dde4ee;
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--text-3);
+      text-align: center;
+      border-color: #c5cad5;
+    }
+    .mp-group-table .mp-subhdr th:first-child { text-align: left; }
+    /* Data cells */
+    .mp-group-table td.mp-name {
+      font-weight: 500;
+      color: var(--text-2);
+      min-width: 110px;
+    }
+    .mp-group-table td.mp-input-cell {
+      padding: 3px 6px;
+      text-align: center;
+    }
+    .mp-group-table td.mp-total-cell {
+      text-align: center;
+      font-weight: 600;
+      background: #f0f3f8;
+      color: var(--text-1);
+      min-width: 52px;
+    }
+    /* Number input */
+    .mp-num {
+      width: 60px;
+      text-align: center;
+      border: 1px solid var(--border-solid2);
+      border-radius: 4px;
+      padding: 3px 4px;
+      font-size: 12px;
+      font-family: inherit;
+      background: var(--bg-1);
+      color: var(--text-1);
+      outline: none;
+    }
+    .mp-num:focus { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(94,106,210,.12); }
+    .mp-num::-webkit-inner-spin-button,
+    .mp-num::-webkit-outer-spin-button { opacity: 1; }
+
+    /* Grand total bar */
+    .mp-grand-total {
+      background: var(--bg-1);
+      border: 1px solid var(--border-solid2);
+      border-radius: 8px;
+      padding: 12px 18px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      font-size: 13px;
+    }
+  </style>
+</head>
+<body>
+<div class="app-layout">
+  <div id="sidebarMount"></div>
+  <div class="main-content">
+    <div id="topbarMount"></div>
+    <div class="page-body">
+
+      <!-- Action Bar -->
+      <div class="flex items-center gap-3 mb-5 flex-wrap">
+        <div id="grandTotalBar" class="mp-grand-total">
+          <span class="text-muted" style="font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.04em">Grand Total MP</span>
+          <span id="grandTotalVal" style="font-size:22px;font-weight:700;color:var(--accent)">0</span>
+        </div>
+        <div class="ml-auto flex gap-2">
+          <button class="btn btn-ghost btn-sm" id="exportBtn">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Export
+          </button>
+          <button class="btn btn-primary btn-sm" id="saveBtn">Simpan</button>
+        </div>
+      </div>
+
+      <!-- MP Group Tables Grid -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start" id="mpContainer"></div>
+
+    </div>
+  </div>
+</div>
+
+<script src="shared-components.js"></script>
+<script>
+// ── Group definitions ─────────────────────────────────────────────
+const MP_GROUPS = [
+  { name: 'Assembling',    lines: ['Line 1','Line 2','Line 3','Line 4','Line 5','Line 6','Line 7','Line MCB','Line IB'] },
+  { name: 'Wet Battery',   lines: ['Wet A','Wet F'] },
+  { name: 'Formation',     lines: ['Formation C','Formation F'] },
+  { name: 'Pasting',       lines: ['Pasting 4','Pasting 5','Pasting 6'] },
+  { name: 'Mixing',        lines: ['Mixing E'] },
+  { name: 'Ball Mill',     lines: ['Ball Mill E'] },
+  { name: 'Grid Casting',  lines: ['Grid Casting'] },
+  { name: 'Grid Punching', lines: ['Grid Punching'] },
+  { name: 'Wide Strip',    lines: ['Wide Strip'] },
+  { name: 'Lithium',       lines: ['Line Lithium','Line Charger'] },
+];
+
+// Safe HTML id from group + line + shift
+function sid(g, l, s) {
+  return ('mp__' + g + '__' + l + '__' + s).replace(/[^a-zA-Z0-9_]/g, '_');
+}
+function gtid(g)    { return 'mpgt__' + g.replace(/[^a-zA-Z0-9]/g, '_'); }
+function ltid(g, l) { return 'mplt__' + (g + '__' + l).replace(/[^a-zA-Z0-9]/g, '_'); }
+
+// ── Init ──────────────────────────────────────────────────────────
+function pageInit() {
+  document.getElementById('topbarMount').innerHTML = BPMS.renderTopbar('Man Power');
+  renderAll();
+  document.getElementById('saveBtn').addEventListener('click', saveAll);
+  document.getElementById('exportBtn').addEventListener('click', exportExcel);
+}
+
+// ── Render ────────────────────────────────────────────────────────
+function renderAll() {
+  const state = BPMS.getState();
+  if (!state.mpGroups) state.mpGroups = {};
+
+  document.getElementById('mpContainer').innerHTML = MP_GROUPS.map(group => {
+    const gData = state.mpGroups[group.name] || {};
+
+    const rows = group.lines.map(line => {
+      const d   = gData[line] || { s1: 0, s2: 0, s3: 0 };
+      const tot = (d.s1 || 0) + (d.s2 || 0) + (d.s3 || 0);
+      return `<tr>
+        <td class="mp-name">${line}</td>
+        <td class="mp-input-cell">
+          <input class="mp-num" type="number" min="0" id="${sid(group.name,line,'s1')}" value="${d.s1||0}" oninput="onInput('${group.name}')"/>
+        </td>
+        <td class="mp-input-cell">
+          <input class="mp-num" type="number" min="0" id="${sid(group.name,line,'s2')}" value="${d.s2||0}" oninput="onInput('${group.name}')"/>
+        </td>
+        <td class="mp-input-cell">
+          <input class="mp-num" type="number" min="0" id="${sid(group.name,line,'s3')}" value="${d.s3||0}" oninput="onInput('${group.name}')"/>
+        </td>
+        <td class="mp-total-cell" id="${ltid(group.name,line)}">${tot}</td>
+      </tr>`;
+    }).join('');
+
+    const groupTot = group.lines.reduce((sum, line) => {
+      const d = gData[line] || { s1: 0, s2: 0, s3: 0 };
+      return sum + (d.s1 || 0) + (d.s2 || 0) + (d.s3 || 0);
+    }, 0);
+
+    return `<div class="mp-group-wrap">
+      <table class="mp-group-table">
+        <thead>
+          <tr class="mp-group-hdr">
+            <td colspan="5">
+              <div class="mp-group-hdr-inner">
+                <span>${group.name}</span>
+                <span class="mp-group-hdr-total"><strong id="${gtid(group.name)}">${groupTot}</strong> MP</span>
+              </div>
+            </td>
+          </tr>
+          <tr class="mp-subhdr">
+            <th>Line</th>
+            <th>MP Shift 1</th>
+            <th>MP Shift 2</th>
+            <th>MP Shift 3</th>
+            <th>Total</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>`;
+  }).join('');
+
+
+  refreshGrandTotal();
+}
+
+// ── Live recalc ───────────────────────────────────────────────────
+function onInput(groupName) {
+  const group = MP_GROUPS.find(g => g.name === groupName);
+  if (!group) return;
+  let groupTot = 0;
+  group.lines.forEach(line => {
+    const s1  = Number(document.getElementById(sid(groupName, line, 's1'))?.value) || 0;
+    const s2  = Number(document.getElementById(sid(groupName, line, 's2'))?.value) || 0;
+    const s3  = Number(document.getElementById(sid(groupName, line, 's3'))?.value) || 0;
+    const tot = s1 + s2 + s3;
+    const el  = document.getElementById(ltid(groupName, line));
+    if (el) el.textContent = tot;
+    groupTot += tot;
+  });
+  const gtEl = document.getElementById(gtid(groupName));
+  if (gtEl) gtEl.textContent = groupTot;
+  refreshGrandTotal();
+}
+
+function refreshGrandTotal() {
+  let grand = 0;
+  MP_GROUPS.forEach(group => {
+    const el = document.getElementById(gtid(group.name));
+    grand += Number(el?.textContent) || 0;
+  });
+  document.getElementById('grandTotalVal').textContent = grand.toLocaleString();
+}
+
+// ── Save ──────────────────────────────────────────────────────────
+async function saveAll() {
+  const state = BPMS.getState();
+  if (!state.mpGroups) state.mpGroups = {};
+
+  MP_GROUPS.forEach(group => {
+    if (!state.mpGroups[group.name]) state.mpGroups[group.name] = {};
+    group.lines.forEach(line => {
+      state.mpGroups[group.name][line] = {
+        s1: Number(document.getElementById(sid(group.name, line, 's1'))?.value) || 0,
+        s2: Number(document.getElementById(sid(group.name, line, 's2'))?.value) || 0,
+        s3: Number(document.getElementById(sid(group.name, line, 's3'))?.value) || 0,
+      };
+    });
+  });
+
+  BPMS.showLoading();
+  const ok = await BPMS.saveState();
+  BPMS.hideLoading();
+  BPMS.toast(ok ? 'Data Man Power disimpan' : 'Tersimpan lokal', ok ? 'success' : 'info');
+}
+
+// ── Export ────────────────────────────────────────────────────────
+function exportExcel() {
+  const state = BPMS.getState();
+  const rows  = [];
+
+  MP_GROUPS.forEach(group => {
+    group.lines.forEach(line => {
+      const d = state.mpGroups?.[group.name]?.[line] || { s1: 0, s2: 0, s3: 0 };
+      rows.push({
+        Group:       group.name,
+        Line:        line,
+        'MP Shift 1': d.s1 || 0,
+        'MP Shift 2': d.s2 || 0,
+        'MP Shift 3': d.s3 || 0,
+        Total:       (d.s1 || 0) + (d.s2 || 0) + (d.s3 || 0),
+      });
+    });
+  });
+
+  const ws = XLSX.utils.json_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'ManPower');
+  XLSX.writeFile(wb, 'FAH_ManPower.xlsx');
+  BPMS.toast('Export berhasil', 'success');
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>LVC Analysis — Factory Analytics Hub</title>
+  <link rel="stylesheet" href="style.css"/>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <style>
+    .lvc-bar-wrap { display: flex; align-items: flex-end; gap: 16px; height: 280px; padding: 0 8px; }
+    .lvc-bar-item { display: flex; flex-direction: column; align-items: center; gap: 4px; flex: 1; min-width: 60px; max-width: 100px; position: relative; }
+    .lvc-bar-track { width: 100%; flex: 1; background: var(--bg-2); border: 1px solid var(--border-solid2); border-radius: 6px 6px 0 0; position: relative; overflow: visible; }
+    .lvc-bar-fill { position: absolute; bottom: 0; left: 0; right: 0; border-radius: 4px 4px 0 0; transition: height 0.4s ease; min-height: 2px; }
+    .lvc-bar-label { font-size: 11px; color: var(--text-4); }
+    .lvc-bar-pct { font-size: 12px; font-weight: 600; }
+    .ref-line { position: absolute; left: 0; right: 0; border-top: 1px dashed; z-index: 2; }
+    .ref-line-label { position: absolute; right: 4px; font-size: 9px; top: -10px; white-space: nowrap; font-weight: 500; }
+    .unmapped-badge { display: inline-flex; align-items: center; padding: 2px 7px; border-radius: 4px; font-size: 11px; background: rgba(224,108,0,0.12); color: var(--orange); border: 1px solid rgba(224,108,0,0.3); cursor: pointer; }
+  </style>
+</head>
+<body>
+<div class="app-layout">
+  <div id="sidebarMount"></div>
+  <div class="main-content">
+    <div id="topbarMount"></div>
+    <div class="page-body">
+
+      <!-- Controls -->
+      <div class="flex items-center gap-3 mb-6 flex-wrap">
+        <div class="period-bar" style="margin-bottom:0">
+          <span class="period-label">Periode:</span>
+          <select id="periodSelect" class="form-control" style="width:auto">
+            <option value="">— Pilih Periode —</option>
+          </select>
+        </div>
+        <div class="ml-auto flex gap-2">
+          <button class="btn btn-ghost btn-sm" id="exportBtn">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Export
+          </button>
+        </div>
+      </div>
+
+      <!-- Stats -->
+      <div class="stats-grid mb-6" id="lvcStats">
+        <div class="stat-card"><div class="stat-label">Total Order</div><div class="stat-value" id="sOrders">—</div></div>
+        <div class="stat-card"><div class="stat-label">Total Qty</div><div class="stat-value" id="sQty">—</div></div>
+        <div class="stat-card"><div class="stat-label">Hari Kerja</div><div class="stat-value" id="sDays">—</div></div>
+        <div class="stat-card"><div class="stat-label">Unmapped</div><div class="stat-value" id="sUnmapped">—</div><div class="stat-sub">Item tanpa PCS match</div></div>
+      </div>
+
+      <!-- Chart -->
+      <div class="card mb-6">
+        <div class="card-header">
+          <span class="card-title">Loading vs Capacity Chart</span>
+          <div class="flex gap-3 text-sm" style="font-size:11px;color:var(--text-4)">
+            <span style="display:flex;align-items:center;gap:4px"><span style="width:12px;height:2px;background:var(--red);display:inline-block;border-radius:1px"></span>100% (Full)</span>
+            <span style="display:flex;align-items:center;gap:4px"><span style="width:12px;height:2px;background:var(--orange);display:inline-block;border-radius:1px"></span>85% (Warning)</span>
+          </div>
+        </div>
+        <div id="lvcChart">
+          <div class="empty-state"><div class="empty-icon">📊</div><div class="empty-title">Pilih periode untuk melihat chart</div></div>
+        </div>
+      </div>
+
+      <!-- Unmapped panel -->
+      <div id="unmappedPanel" class="card mb-6" style="display:none">
+        <div class="card-header">
+          <span class="card-title" style="color:var(--orange)">⚠ Item Tidak Termapping</span>
+          <button class="btn btn-ghost btn-xs" onclick="document.getElementById('unmappedTable').parentElement.style.display = document.getElementById('unmappedTable').parentElement.style.display === 'none' ? '' : 'none'">Toggle</button>
+        </div>
+        <p class="text-sm text-muted mb-3" style="margin-top:-8px">Item berikut tidak ditemukan di Database PCS. Pastikan Battery Type cocok.</p>
+        <div class="table-wrap">
+          <div class="table-scroll">
+            <table><thead><tr><th>ITEM</th><th>Battery Type</th><th>Tech</th><th>Separator</th><th>Plate</th><th>Qty</th></tr></thead>
+            <tbody id="unmappedTable"></tbody></table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Detail Table -->
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Detail LVC per LINE</span>
+        </div>
+        <div class="table-wrap">
+          <div class="table-scroll">
+            <table id="lvcTable">
+              <thead>
+                <tr>
+                  <th>LINE</th>
+                  <th>Total Qty</th>
+                  <th>Processing Time (Jam)</th>
+                  <th>Kapasitas Total (Jam)</th>
+                  <th>Loading %</th>
+                  <th>Status</th>
+                  <th>Shift Aktif</th>
+                  <th>Hari Kerja</th>
+                  <th>Menit/Hari</th>
+                </tr>
+              </thead>
+              <tbody id="lvcBody">
+                <tr><td colspan="9"><div class="empty-state"><div class="empty-icon">📈</div><div class="empty-title">Pilih periode untuk kalkulasi LVC</div></div></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="shared-components.js"></script>
+<script>
+let currentPeriod = '';
+let lvcResults    = [];
+
+function pageInit() {
+  document.getElementById('topbarMount').innerHTML = BPMS.renderTopbar('LVC Analysis',
+    '<span class="text-muted text-sm">Loading vs Capacity</span>');
+
+  const sel = document.getElementById('periodSelect');
+  BPMS.getPeriods().forEach(p => {
+    const opt = document.createElement('option');
+    opt.value = p; opt.textContent = BPMS.formatPeriod(p) + ' (' + p + ')';
+    sel.appendChild(opt);
+  });
+
+  sel.addEventListener('change', () => { currentPeriod = sel.value; if (currentPeriod) calcAndRender(); });
+  document.getElementById('exportBtn').addEventListener('click', exportExcel);
+
+  const current = BPMS.getCurrentPeriod();
+  if (BPMS.getPeriods().includes(current)) { sel.value = current; currentPeriod = current; calcAndRender(); }
+}
+
+function calcAndRender() {
+  const state  = BPMS.getState();
+  const orders = state.orders?.[currentPeriod] || [];
+  const days   = BPMS.getWorkDayCount(currentPeriod);
+
+  const totalQty = orders.reduce((s, o) => s + (Number(o.qty)||0), 0);
+  document.getElementById('sOrders').textContent = orders.length.toLocaleString();
+  document.getElementById('sQty').textContent    = totalQty.toLocaleString();
+  document.getElementById('sDays').textContent   = days;
+
+  const { results, unmapped } = BPMS.calcLVC(currentPeriod);
+  lvcResults = results;
+
+  document.getElementById('sUnmapped').textContent = unmapped.length;
+
+  renderChart(results, state);
+  renderTable(results, state);
+  renderUnmapped(unmapped);
+}
+
+// ── SVG-based bar chart ───────────────────────────────────────────
+
+function renderChart(results, state) {
+  const W = 760, H = 300;
+  const mL = 56, mR = 20, mT = 36, mB = 50;
+  const chartW = W - mL - mR;
+  const chartH = H - mT - mB;
+
+  const maxLoad = Math.max(120, ...results.map(r => r.loading));
+  const sy = v => chartH - (v / maxLoad) * chartH;
+
+  const barsPerLine = 1;
+  const totalBars   = results.length;
+  const barSlot     = chartW / totalBars;
+  const barW        = Math.min(48, barSlot * 0.55);
+
+  let svg = `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="max-width:100%;overflow:visible">`;
+
+  // Grid lines + Y labels
+  [0, 25, 50, 75, 100, 125].forEach(v => {
+    if (v > maxLoad + 10) return;
+    const y = sy(v) + mT;
+    svg += `<line x1="${mL}" y1="${y}" x2="${W-mR}" y2="${y}" stroke="rgba(0,0,0,0.06)" stroke-width="1"/>
+      <text x="${mL-5}" y="${y+4}" text-anchor="end" font-size="10" fill="#9b9fa8">${v}%</text>`;
+  });
+
+  // Axes
+  svg += `<line x1="${mL}" y1="${mT}" x2="${mL}" y2="${mT+chartH}" stroke="rgba(0,0,0,0.15)" stroke-width="1"/>
+    <line x1="${mL}" y1="${mT+chartH}" x2="${W-mR}" y2="${mT+chartH}" stroke="rgba(0,0,0,0.15)" stroke-width="1"/>`;
+
+  // Reference lines
+  const refs = [{ v: 100, col: '#dc2626', lbl: '100%' }, { v: 85, col: '#c05a00', lbl: '85%' }];
+  refs.forEach(({ v, col, lbl }) => {
+    const y = sy(v) + mT;
+    svg += `<line x1="${mL}" y1="${y}" x2="${W-mR}" y2="${y}" stroke="${col}" stroke-width="1" stroke-dasharray="6,4" opacity="0.7"/>
+      <text x="${W-mR+3}" y="${y+4}" font-size="9" fill="${col}" opacity="0.8">${lbl}</text>`;
+  });
+
+  // Shift capacity reference lines per bar
+  results.forEach((r, i) => {
+    const cx = mL + barSlot * i + barSlot / 2;
+    const x  = cx - barW / 2;
+
+    // Background track
+    svg += `<rect x="${x}" y="${mT}" width="${barW}" height="${chartH}" fill="rgba(0,0,0,0.03)" rx="4"/>`;
+
+    if (r.capacityHours > 0) {
+      // Shift capacity lines (S1, S1+S2 as fraction of total capacity)
+      const cfg = BPMS.getState().capacity?.[currentPeriod]?.[r.line] || { s1: true, s2: true, s3: false };
+      const wdays = BPMS.getWorkDayCount(currentPeriod);
+      const totalMins = (cfg.s1 ? 435 : 0) + (cfg.s2 ? 405 : 0) + (cfg.s3 ? 370 : 0);
+
+      [
+        { mins: cfg.s1 ? 435 : 0, col: 'rgba(113,112,255,0.5)', lbl: 'S1' },
+        { mins: (cfg.s1 ? 435 : 0) + (cfg.s2 ? 405 : 0), col: 'rgba(113,112,255,0.7)', lbl: 'S1+S2' },
+      ].forEach(({ mins, col, lbl }) => {
+        if (!mins) return;
+        const capHrs = (mins * wdays) / 60;
+        const pct    = (capHrs / r.capacityHours) * 100;
+        const y      = sy(pct) + mT;
+        svg += `<line x1="${x}" y1="${y}" x2="${x+barW}" y2="${y}" stroke="${col}" stroke-width="1" stroke-dasharray="3,2"/>`;
+      });
+    }
+
+    // Bar fill
+    const pct = Math.min(r.loading, maxLoad);
+    const bh  = (pct / maxLoad) * chartH;
+    const by  = mT + chartH - bh;
+    const col = r.loading > 100 ? '#dc2626' : r.loading > 85 ? '#c05a00' : '#16a34a';
+
+    svg += `<rect x="${x}" y="${by}" width="${barW}" height="${bh}" fill="${col}" opacity="0.9" rx="4"/>`;
+
+    // Value label
+    if (r.processingHours > 0) {
+      svg += `<text x="${cx}" y="${by - 6}" text-anchor="middle" font-size="10" fill="${col}" font-weight="600">${r.loading.toFixed(1)}%</text>`;
+    }
+
+    // X label
+    svg += `<text x="${cx}" y="${mT + chartH + 16}" text-anchor="middle" font-size="11" fill="#6c717d">${r.line.replace('Line ', 'L')}</text>`;
+  });
+
+  svg += '</svg>';
+  document.getElementById('lvcChart').innerHTML = `<div style="overflow-x:auto;padding:8px 0">${svg}</div>`;
+}
+
+function renderTable(results, state) {
+  const body = document.getElementById('lvcBody');
+  if (!results.length) {
+    body.innerHTML = '<tr><td colspan="9"><div class="empty-state"><div class="empty-icon">📈</div><div class="empty-title">Tidak ada data</div></div></td></tr>';
+    return;
+  }
+
+  body.innerHTML = results.map(r => {
+    const cfg = state.capacity?.[currentPeriod]?.[r.line] || { s1: true, s2: true, s3: false };
+    const shifts = [cfg.s1 && 'S1', cfg.s2 && 'S2', cfg.s3 && 'S3'].filter(Boolean).join('+') || '—';
+    const mins   = BPMS.shiftMinutes(cfg);
+    const days   = BPMS.getWorkDayCount(currentPeriod);
+    const badgeCls = r.status === 'OVERLOADED' ? 'badge-danger' : r.status === 'WARNING' ? 'badge-warning' : 'badge-ok';
+    const rowCls   = r.status === 'OVERLOADED' ? 'row-highlight-danger' : r.status === 'WARNING' ? 'row-highlight-warning' : '';
+    const loadStr  = r.processingHours > 0 ? r.loading.toFixed(2) + '%' : '—';
+
+    return `<tr class="${rowCls}">
+      <td><strong>${r.line}</strong></td>
+      <td>${BPMS.fmtInt(r.qty)}</td>
+      <td class="font-mono">${BPMS.fmtNum(r.processingHours, 4)}</td>
+      <td class="font-mono">${BPMS.fmtNum(r.capacityHours, 2)}</td>
+      <td><strong class="${r.loading > 100 ? 'text' : ''}" style="${r.loading > 100 ? 'color:var(--red)' : r.loading > 85 ? 'color:var(--orange)' : ''}">${loadStr}</strong></td>
+      <td><span class="badge ${badgeCls}">${r.processingHours > 0 ? r.status : 'IDLE'}</span></td>
+      <td>${shifts}</td>
+      <td>${days}</td>
+      <td class="font-mono">${mins}</td>
+    </tr>`;
+  }).join('');
+}
+
+function renderUnmapped(unmapped) {
+  const panel = document.getElementById('unmappedPanel');
+  if (!unmapped.length) { panel.style.display = 'none'; return; }
+  panel.style.display = '';
+  document.getElementById('unmappedTable').innerHTML = unmapped.map(r => {
+    const p = r._parsed || BPMS.parseItemString(r.item) || {};
+    return `<tr>
+      <td class="font-mono" style="font-size:11px">${r.item}</td>
+      <td><strong>${p.battType || '—'}</strong></td>
+      <td>${p.tech || '—'}</td>
+      <td>${p.separator || '—'}</td>
+      <td>${p.plate || '—'}</td>
+      <td>${(r.qty||0).toLocaleString()}</td>
+    </tr>`;
+  }).join('');
+}
+
+function exportExcel() {
+  if (!lvcResults.length) { BPMS.toast('Tidak ada data untuk diekspor', 'error'); return; }
+  const state = BPMS.getState();
+  const rows  = lvcResults.map(r => {
+    const cfg  = state.capacity?.[currentPeriod]?.[r.line] || {};
+    const mins = BPMS.shiftMinutes(cfg);
+    return {
+      LINE: r.line,
+      'Total Qty': r.qty,
+      'Processing Time (Jam)': +r.processingHours.toFixed(4),
+      'Kapasitas Total (Jam)': +r.capacityHours.toFixed(2),
+      'Loading (%)': +r.loading.toFixed(2),
+      Status: r.processingHours > 0 ? r.status : 'IDLE',
+      'Shift Aktif': [cfg.s1&&'S1',cfg.s2&&'S2',cfg.s3&&'S3'].filter(Boolean).join('+'),
+      'Hari Kerja': BPMS.getWorkDayCount(currentPeriod),
+      'Menit/Hari': mins,
+    };
+  });
+  const ws = XLSX.utils.json_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'LVC ' + currentPeriod);
+  XLSX.writeFile(wb, `FAH_LVC_${currentPeriod}.xlsx`);
+  BPMS.toast('Export berhasil', 'success');
+}
+</script>
+</body>
+</html>

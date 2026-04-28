@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Database PCS — Factory Analytics Hub</title>
+  <link rel="stylesheet" href="style.css"/>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <style>
+    /* Give the table its own scroll area so position:sticky works correctly */
+    .table-wrap {
+      overflow: hidden;                  /* keeps border-radius clipping */
+      height: calc(100vh - 152px);      /* topbar 52 + padding 24 + actionbar 56 + border 2 + buffer 18 */
+    }
+    .table-scroll {
+      height: 100%;
+      overflow: auto;                    /* both axes scroll */
+    }
+
+    /* ── PCS table — auto-fit columns to content ──────────── */
+    #pcsTable { font-size: 12px; table-layout: auto; width: max-content; min-width: 100%; }
+    #pcsTable th, #pcsTable td { padding: 5px 10px; white-space: nowrap; }
+    #pcsTable thead tr:first-child th { text-align: center; font-size: 11px; letter-spacing: .4px; padding: 6px 10px; height: 28px; box-sizing: border-box; }
+    #pcsTable thead tr:last-child th  { font-size: 11px; color: var(--text-3); font-weight: 600; text-align: center; padding: 4px 10px; }
+
+    /* Group colours — fully opaque so scrolling content never bleeds through */
+    .th-spec  { background: #f0f2f5; }
+    .th-l1    { background: #e9ebf8; color: #4a54b8; }
+    .th-l2    { background: #e6f4ec; color: #15803d; }
+    .th-act   { background: #f0f2f5; }
+
+    /* Cell overrides */
+    #pcsTable td:nth-child(3) { font-weight: 600; font-size: 12px; }
+    #pcsTable .font-mono { font-family: var(--font-mono,monospace); font-size: 11.5px; }
+    #pcsTable .badge { font-size: 10px; padding: 1px 5px; }
+
+    /* Subtly tint data cells matching header groups */
+    #pcsTable td:nth-child(n+7):nth-child(-n+14)  { background: #f5f6fd; }
+    #pcsTable td:nth-child(n+15):nth-child(-n+22) { background: #f3faf5; }
+
+    /* Filter icon inline */
+    .th-filter { cursor: pointer; display: inline-flex; align-items: center; gap: 2px; }
+
+    /* ── Data cell alignment ───────────────────────────────── */
+    /* Spec: MDL left, GRP/PLT/SEP/SPC center, Battery Type left */
+    #pcsTable td:nth-child(2),
+    #pcsTable td:nth-child(4),
+    #pcsTable td:nth-child(5),
+    #pcsTable td:nth-child(6)  { text-align: center; }
+    /* LINE badges */
+    #pcsTable td:nth-child(7),
+    #pcsTable td:nth-child(15) { text-align: center; }
+    /* Numeric: CT, B/H, S1, S2, S3, TOT — right-aligned */
+    #pcsTable td:nth-child(8),  #pcsTable td:nth-child(9),
+    #pcsTable td:nth-child(10), #pcsTable td:nth-child(11),
+    #pcsTable td:nth-child(12), #pcsTable td:nth-child(13),
+    #pcsTable td:nth-child(16), #pcsTable td:nth-child(17),
+    #pcsTable td:nth-child(18), #pcsTable td:nth-child(19),
+    #pcsTable td:nth-child(20), #pcsTable td:nth-child(21) { text-align: right; font-variant-numeric: tabular-nums; }
+    /* TOT bold */
+    #pcsTable td:nth-child(13),
+    #pcsTable td:nth-child(21) { font-weight: 600; color: var(--text-1); }
+    /* Aksi center */
+    #pcsTable td:nth-child(23) { text-align: center; }
+
+    /* ── Sticky header ─────────────────────────────────────── */
+    #pcsTable thead tr:first-child th {
+      position: sticky;
+      top: 0;
+      z-index: 3;
+    }
+    #pcsTable thead tr:last-child th {
+      position: sticky;
+      top: 28px; /* height of first header row */
+      z-index: 3;
+    }
+    /* Shadow line when content scrolls under */
+    #pcsTable thead tr:last-child th {
+      box-shadow: 0 2px 4px -1px rgba(0,0,0,0.08);
+    }
+    /* Rowspan Aksi cell covers both rows */
+    #pcsTable thead th[rowspan="2"] {
+      position: sticky;
+      top: 0;
+      z-index: 3;
+    }
+  </style>
+</head>
+<body>
+<div class="app-layout">
+  <div id="sidebarMount"></div>
+  <div class="main-content">
+    <div id="topbarMount"></div>
+    <div class="page-body">
+
+      <input type="file" id="fileInput" accept=".xlsx,.xls" style="display:none"/>
+
+      <!-- Action Bar -->
+      <div class="flex items-center gap-3 mb-4">
+        <span class="stat-value" id="pcsCount" style="font-size:20px">0</span>
+        <span class="text-muted text-sm">entri PCS</span>
+        <div class="ml-auto flex gap-2">
+          <input type="text" id="searchInput" class="form-control" placeholder="Cari tipe baterai..." style="width:220px"/>
+          <button class="btn btn-ghost btn-sm" id="uploadBtn">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            Upload PCS
+          </button>
+          <button class="btn btn-ghost btn-sm" id="exportBtn">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Export Excel
+          </button>
+          <button class="btn btn-danger btn-sm" id="clearBtn">Hapus Semua</button>
+        </div>
+      </div>
+
+      <!-- Table -->
+      <div class="table-wrap">
+        <div class="table-scroll">
+          <table id="pcsTable">
+            <colgroup>
+              <col class="c-mdl"/><col class="c-grp"/><col class="c-bat"/>
+              <col class="c-plt"/><col class="c-sep"/><col class="c-spc"/>
+              <col class="c-line"/><col class="c-ct"/><col class="c-bh"/>
+              <col class="c-s"/><col class="c-s"/><col class="c-s"/><col class="c-tot"/><col class="c-bn"/>
+              <col class="c-line"/><col class="c-ct"/><col class="c-bh"/>
+              <col class="c-s"/><col class="c-s"/><col class="c-s"/><col class="c-tot"/><col class="c-bn"/>
+              <col class="c-aksi"/>
+            </colgroup>
+            <thead>
+              <!-- Row 1: Group headers -->
+              <tr>
+                <th colspan="6" class="th-spec">Spesifikasi</th>
+                <th colspan="8" class="th-l1">⬡ 1st Process</th>
+                <th colspan="8" class="th-l2">⬡ 2nd Process</th>
+                <th rowspan="2" class="th-act" style="vertical-align:middle"></th>
+              </tr>
+              <!-- Row 2: Column headers -->
+              <tr>
+                <th class="th-spec"><span class="th-filter" data-col="0">Model<span class="filter-icon" data-col="0">▾</span></span></th>
+                <th class="th-spec"><span class="th-filter" data-col="1">Group<span class="filter-icon" data-col="1">▾</span></span></th>
+                <th class="th-spec"><span class="th-filter" data-col="2">Battery Type<span class="filter-icon" data-col="2">▾</span></span></th>
+                <th class="th-spec"><span class="th-filter" data-col="3">Plate<span class="filter-icon" data-col="3">▾</span></span></th>
+                <th class="th-spec"><span class="th-filter" data-col="4">Separator<span class="filter-icon" data-col="4">▾</span></span></th>
+                <th class="th-spec">Spacer</th>
+                <th class="th-l1"><span class="th-filter" data-col="6">LINE<span class="filter-icon" data-col="6">▾</span></span></th>
+                <th class="th-l1">CT</th>
+                <th class="th-l1">Batt/H</th>
+                <th class="th-l1">S1</th><th class="th-l1">S2</th><th class="th-l1">S3</th>
+                <th class="th-l1">Total</th>
+                <th class="th-l1">Bottleneck</th>
+                <th class="th-l2"><span class="th-filter" data-col="14">LINE<span class="filter-icon" data-col="14">▾</span></span></th>
+                <th class="th-l2">CT</th>
+                <th class="th-l2">Batt/H</th>
+                <th class="th-l2">S1</th><th class="th-l2">S2</th><th class="th-l2">S3</th>
+                <th class="th-l2">Total</th>
+                <th class="th-l2">Bottleneck</th>
+              </tr>
+            </thead>
+            <tbody id="pcsBody">
+              <tr><td colspan="23">
+                <div class="empty-state">
+                  <div class="empty-icon">🗄️</div>
+                  <div class="empty-title">Belum ada data PCS</div>
+                  <div class="empty-text">Upload file Excel untuk memulai</div>
+                </div>
+              </td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Modal -->
+<div id="editModal" style="display:none;position:fixed;inset:0;z-index:100;background:rgba(0,0,0,0.35);display:none;align-items:center;justify-content:center">
+  <div style="background:var(--bg-1);border:1px solid var(--border-solid2);border-radius:12px;padding:24px;width:560px;max-width:95vw;box-shadow:0 8px 32px rgba(0,0,0,0.15)">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+      <span style="font-size:15px;font-weight:600;color:var(--text-1)">Edit Entri PCS</span>
+      <button class="btn btn-ghost btn-xs" onclick="closeEdit()">✕</button>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div><label class="form-label">Model</label><input class="form-control" id="ef-model"/></div>
+      <div><label class="form-label">Group</label><input class="form-control" id="ef-group"/></div>
+      <div style="grid-column:1/-1"><label class="form-label">Battery Type</label><input class="form-control" id="ef-batteryType"/></div>
+      <div><label class="form-label">Plate</label><input class="form-control" id="ef-plate"/></div>
+      <div><label class="form-label">Separator</label><input class="form-control" id="ef-separator"/></div>
+      <div><label class="form-label">Spacer</label><input class="form-control" id="ef-spacer"/></div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:16px">
+      <div style="grid-column:1/-1;font-size:11px;font-weight:600;color:#4a54b8;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid #e9ebf8;padding-bottom:4px">1st Process</div>
+      <div><label class="form-label">LINE (1st)</label><input class="form-control" id="ef-line1"/></div>
+      <div><label class="form-label">CT/s (1st)</label><input class="form-control" type="number" min="0" id="ef-ct1"/></div>
+      <div style="grid-column:1/-1"><label class="form-label">Bottleneck (1st)</label><input class="form-control" id="ef-bottleneck1"/></div>
+
+      <div style="grid-column:1/-1;font-size:11px;font-weight:600;color:#15803d;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid #e6f4ec;padding-bottom:4px;margin-top:4px">2nd Process</div>
+      <div><label class="form-label">LINE (2nd)</label><input class="form-control" id="ef-line2"/></div>
+      <div><label class="form-label">CT/s (2nd)</label><input class="form-control" type="number" min="0" id="ef-ct2"/></div>
+      <div style="grid-column:1/-1"><label class="form-label">Bottleneck (2nd)</label><input class="form-control" id="ef-bottleneck2"/></div>
+    </div>
+
+    <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:20px">
+      <button class="btn btn-ghost btn-sm" onclick="closeEdit()">Batal</button>
+      <button class="btn btn-primary btn-sm" onclick="saveEdit()">Simpan</button>
+    </div>
+  </div>
+</div>
+
+<!-- Column Filter Dropdown (shared) -->
+<div id="filterDropdown" class="col-filter-dropdown" style="display:none">
+  <input class="filter-search" id="filterSearch" placeholder="Cari..."/>
+  <div class="filter-list" id="filterList"></div>
+  <div class="filter-actions">
+    <button class="btn btn-xs btn-ghost" id="filterSelectAll">Semua</button>
+    <button class="btn btn-xs btn-ghost" id="filterClearAll">Hapus</button>
+    <button class="btn btn-xs btn-primary ml-auto" id="filterApply">Terapkan</button>
+  </div>
+</div>
+
+<script src="shared-components.js"></script>
+<script>
+let allData  = [];
+let colFilters = {}; // colIdx -> Set of selected values
+let activeFilterCol = null;
+
+function pageInit() {
+  document.getElementById('topbarMount').innerHTML = BPMS.renderTopbar('Database PCS',
+    `<span class="text-muted text-sm">Master Production Capacity Standard</span>`);
+
+  allData = [...(BPMS.getState().dbPCS || [])];
+  renderTable();
+
+  // Upload — tombol kecil + drag & drop ke tabel
+  const input = document.getElementById('fileInput');
+  document.getElementById('uploadBtn').addEventListener('click', () => input.click());
+  input.addEventListener('change', () => handleFile(input.files[0]));
+
+  // Drag & drop ke seluruh halaman (area tabel)
+  const pageBody = document.querySelector('.page-body');
+  pageBody.addEventListener('dragover', e => { e.preventDefault(); pageBody.classList.add('page-dragover'); });
+  pageBody.addEventListener('dragleave', e => { if (!pageBody.contains(e.relatedTarget)) pageBody.classList.remove('page-dragover'); });
+  pageBody.addEventListener('drop', e => { e.preventDefault(); pageBody.classList.remove('page-dragover'); handleFile(e.dataTransfer.files[0]); });
+
+  document.getElementById('exportBtn').addEventListener('click', exportExcel);
+  document.getElementById('clearBtn').addEventListener('click', clearAll);
+  document.getElementById('searchInput').addEventListener('input', () => renderTable());
+
+  // Column filters
+  document.querySelectorAll('.th-filter').forEach(el => {
+    el.addEventListener('click', e => {
+      e.stopPropagation();
+      const col = parseInt(el.dataset.col);
+      openFilterDropdown(col, el);
+    });
+  });
+
+  document.getElementById('filterApply').addEventListener('click', () => {
+    closeFilterDropdown();
+    renderTable();
+  });
+  document.getElementById('filterSelectAll').addEventListener('click', () => {
+    document.querySelectorAll('#filterList input[type=checkbox]').forEach(cb => cb.checked = true);
+  });
+  document.getElementById('filterClearAll').addEventListener('click', () => {
+    document.querySelectorAll('#filterList input[type=checkbox]').forEach(cb => cb.checked = false);
+  });
+  document.getElementById('filterSearch').addEventListener('input', e => {
+    const q = e.target.value.toLowerCase();
+    document.querySelectorAll('.filter-opt').forEach(opt => {
+      opt.style.display = opt.textContent.toLowerCase().includes(q) ? '' : 'none';
+    });
+  });
+  document.addEventListener('click', () => closeFilterDropdown());
+  document.getElementById('editModal').addEventListener('click', e => { if (e.target === e.currentTarget) closeEdit(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeEdit(); });
+}
+
+// ── Filter Dropdown ──────────────────────────────────────────────
+
+function openFilterDropdown(col, thEl) {
+  activeFilterCol = col;
+  const dropdown  = document.getElementById('filterDropdown');
+  const list      = document.getElementById('filterList');
+  document.getElementById('filterSearch').value = '';
+
+  // Collect unique values
+  const values = [...new Set(allData.map(r => getCellValue(r, col)))].sort();
+  const selected = colFilters[col] || new Set(values);
+
+  list.innerHTML = values.map(v => `
+    <label class="filter-opt">
+      <input type="checkbox" value="${v}" ${selected.has(v) ? 'checked' : ''}/>
+      ${v || '(kosong)'}
+    </label>`).join('');
+
+  // Position dropdown below th
+  const rect = thEl.getBoundingClientRect();
+  dropdown.style.top  = (rect.bottom + 2) + 'px';
+  dropdown.style.left = rect.left + 'px';
+  dropdown.style.display = 'flex';
+  dropdown.addEventListener('click', e => e.stopPropagation());
+}
+
+function closeFilterDropdown() {
+  const dropdown = document.getElementById('filterDropdown');
+  if (dropdown.style.display === 'none' || activeFilterCol === null) return;
+
+  // Save selections
+  const checkboxes = dropdown.querySelectorAll('#filterList input[type=checkbox]');
+  const selected   = new Set();
+  checkboxes.forEach(cb => { if (cb.checked) selected.add(cb.value); });
+  colFilters[activeFilterCol] = selected;
+
+  // Update filter icon
+  const allValues = [...new Set(allData.map(r => getCellValue(r, activeFilterCol)))];
+  const isFiltered = selected.size < allValues.length;
+  document.querySelectorAll(`.filter-icon[data-col="${activeFilterCol}"]`).forEach(el => {
+    el.classList.toggle('active', isFiltered);
+  });
+
+  dropdown.style.display = 'none';
+  activeFilterCol = null;
+}
+
+function getCellValue(row, col) {
+  const map = ['model','group','batteryType','plate','separator','spacer','line1','ct1',null,null,null,null,null,'bottleneck1','line2','ct2',null,null,null,null,null,'bottleneck2'];
+  const key = map[col];
+  return key ? String(row[key] ?? '') : '';
+}
+
+// ── Table Rendering ──────────────────────────────────────────────
+
+function renderTable() {
+  const q    = document.getElementById('searchInput').value.toLowerCase();
+  const body = document.getElementById('pcsBody');
+
+  let filtered = allData.filter(r => {
+    if (q && !JSON.stringify(r).toLowerCase().includes(q)) return false;
+    for (const [col, selected] of Object.entries(colFilters)) {
+      if (!selected.size) continue;
+      const v = getCellValue(r, parseInt(col));
+      if (!selected.has(v)) return false;
+    }
+    return true;
+  });
+
+  document.getElementById('pcsCount').textContent = allData.length;
+
+  if (!filtered.length) {
+    body.innerHTML = `<tr><td colspan="23"><div class="empty-state">
+      <div class="empty-icon">🔍</div>
+      <div class="empty-title">Tidak ada data ditemukan</div>
+    </div></td></tr>`;
+    return;
+  }
+
+  const dash = '<span class="text-muted" style="font-size:10px">—</span>';
+  const num  = v => (v != null && v !== '' && v !== 0) ? v : dash;
+  const str  = v => v || dash;
+
+  body.innerHTML = filtered.map((r) => {
+    const c1 = BPMS.calcPCSFields(r.ct1);
+    const c2 = BPMS.calcPCSFields(r.ct2);
+    const i  = allData.indexOf(r);
+    const line1Badge = r.line1 ? `<span class="badge badge-neutral">${r.line1}</span>` : dash;
+    const line2Badge = r.line2 ? `<span class="badge badge-neutral">${r.line2}</span>` : dash;
+    return `<tr>
+      <td>${str(r.model)}</td>
+      <td>${str(r.group)}</td>
+      <td style="text-align:left"><strong>${str(r.batteryType)}</strong></td>
+      <td>${str(r.plate)}</td>
+      <td>${str(r.separator)}</td>
+      <td>${str(r.spacer)}</td>
+      <td>${line1Badge}</td>
+      <td class="font-mono">${num(r.ct1)}</td>
+      <td class="font-mono">${num(c1.battH)}</td>
+      <td class="font-mono">${num(c1.s1)}</td>
+      <td class="font-mono">${num(c1.s2)}</td>
+      <td class="font-mono">${num(c1.s3)}</td>
+      <td class="font-mono">${num(c1.total)}</td>
+      <td style="text-align:left" class="text-muted">${str(r.bottleneck1)}</td>
+      <td>${line2Badge}</td>
+      <td class="font-mono">${num(r.ct2)}</td>
+      <td class="font-mono">${num(c2.battH)}</td>
+      <td class="font-mono">${num(c2.s1)}</td>
+      <td class="font-mono">${num(c2.s2)}</td>
+      <td class="font-mono">${num(c2.s3)}</td>
+      <td class="font-mono">${num(c2.total)}</td>
+      <td style="text-align:left" class="text-muted">${str(r.bottleneck2)}</td>
+      <td style="white-space:nowrap">
+        <button class="btn btn-xs btn-ghost" onclick="openEdit(${i})" title="Edit">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+        </button>
+        <button class="btn btn-xs btn-danger" onclick="deleteRow(${i})" title="Hapus">×</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function deleteRow(idx) {
+  allData.splice(idx, 1);
+  BPMS.getState().dbPCS = [...allData];
+  BPMS.saveState();
+  renderTable();
+  BPMS.toast('Entri dihapus', 'info');
+}
+
+// ── Edit Modal ───────────────────────────────────────────────────
+
+let editIdx = -1;
+
+function openEdit(idx) {
+  editIdx = idx;
+  const r = allData[idx];
+  document.getElementById('ef-model').value       = r.model       || '';
+  document.getElementById('ef-group').value       = r.group       || '';
+  document.getElementById('ef-batteryType').value = r.batteryType || '';
+  document.getElementById('ef-plate').value       = r.plate       || '';
+  document.getElementById('ef-separator').value   = r.separator   || '';
+  document.getElementById('ef-spacer').value      = r.spacer      || '';
+  document.getElementById('ef-line1').value       = r.line1       || '';
+  document.getElementById('ef-ct1').value         = r.ct1         || '';
+  document.getElementById('ef-bottleneck1').value = r.bottleneck1 || '';
+  document.getElementById('ef-line2').value       = r.line2       || '';
+  document.getElementById('ef-ct2').value         = r.ct2         || '';
+  document.getElementById('ef-bottleneck2').value = r.bottleneck2 || '';
+  const modal = document.getElementById('editModal');
+  modal.style.display = 'flex';
+}
+
+function closeEdit() {
+  document.getElementById('editModal').style.display = 'none';
+  editIdx = -1;
+}
+
+function saveEdit() {
+  if (editIdx < 0) return;
+  allData[editIdx] = {
+    model:       document.getElementById('ef-model').value.trim(),
+    group:       document.getElementById('ef-group').value.trim(),
+    batteryType: document.getElementById('ef-batteryType').value.trim(),
+    plate:       document.getElementById('ef-plate').value.trim(),
+    separator:   document.getElementById('ef-separator').value.trim(),
+    spacer:      document.getElementById('ef-spacer').value.trim(),
+    line1:       document.getElementById('ef-line1').value.trim(),
+    ct1:         Number(document.getElementById('ef-ct1').value) || 0,
+    bottleneck1: document.getElementById('ef-bottleneck1').value.trim(),
+    line2:       document.getElementById('ef-line2').value.trim(),
+    ct2:         Number(document.getElementById('ef-ct2').value) || 0,
+    bottleneck2: document.getElementById('ef-bottleneck2').value.trim(),
+  };
+  BPMS.getState().dbPCS = [...allData];
+  BPMS.saveState();
+  renderTable();
+  closeEdit();
+  BPMS.toast('Entri diperbarui', 'success');
+}
+
+function clearAll() {
+  if (!confirm('Hapus semua data PCS?')) return;
+  allData = [];
+  BPMS.getState().dbPCS = [];
+  BPMS.saveState();
+  renderTable();
+  BPMS.toast('Semua data PCS dihapus', 'info');
+}
+
+// ── Excel Import ─────────────────────────────────────────────────
+
+function handleFile(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const wb = XLSX.read(e.target.result, { type: 'binary' });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+
+      // Baca semua baris sebagai array mentah (header:1 = tidak pakai baris pertama sebagai key)
+      // lalu ambil mulai baris ke-3 (index 2) → A3 sampai L paling bawah
+      const rawRows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+      const dataRows = rawRows.slice(2); // lewati baris 1 & 2
+
+      // Kolom A(0)=MODEL, B(1)=GROUP, C(2)=BATTERY TYPE, D(3)=PLATE,
+      // E(4)=SEPARATOR, F(5)=SPACER, G(6)=LINE(1st), H(7)=CT(1st),
+      // I(8)=BOTTLENECK(1st), J(9)=LINE(2nd), K(10)=CT(2nd), L(11)=BOTTLENECK(2nd)
+      const imported = dataRows.map(row => ({
+        model:       String(row[0]  ?? '').trim(),
+        group:       String(row[1]  ?? '').trim(),
+        batteryType: String(row[2]  ?? '').trim(),
+        plate:       String(row[3]  ?? '').trim(),
+        separator:   String(row[4]  ?? '').trim(),
+        spacer:      String(row[5]  ?? '').trim(),
+        line1:       String(row[6]  ?? '').trim(),
+        ct1:         Number(row[7])  || 0,
+        bottleneck1: String(row[8]  ?? '').trim(),
+        line2:       String(row[9]  ?? '').trim(),
+        ct2:         Number(row[10]) || 0,
+        bottleneck2: String(row[11] ?? '').trim(),
+      })).filter(r => r.batteryType && r.batteryType.toUpperCase() !== 'BATTERY TYPE');
+
+      if (!imported.length) {
+        BPMS.toast('Tidak ada data valid di file ini (pastikan data mulai dari baris 3)', 'error');
+        return;
+      }
+
+      allData = imported;
+      BPMS.getState().dbPCS = allData;
+      BPMS.saveState().then(() => BPMS.toast(`${imported.length} entri PCS berhasil diimport`, 'success'));
+      renderTable();
+    } catch (err) {
+      BPMS.toast('Gagal membaca file: ' + err.message, 'error');
+    }
+  };
+  reader.readAsBinaryString(file);
+  document.getElementById('fileInput').value = '';
+}
+
+// ── Excel Export ─────────────────────────────────────────────────
+
+function exportExcel() {
+  if (!allData.length) { BPMS.toast('Tidak ada data untuk diekspor', 'error'); return; }
+  const rows = allData.map(r => {
+    const c1 = BPMS.calcPCSFields(r.ct1);
+    const c2 = BPMS.calcPCSFields(r.ct2);
+    return {
+      MODEL: r.model, GROUP: r.group, 'BATTERY TYPE': r.batteryType,
+      PLATE: r.plate, SEPARATOR: r.separator, SPACER: r.spacer,
+      'LINE(1st)': r.line1, 'CT(s)(1st)': r.ct1, 'BATT/H(1st)': c1.battH,
+      'S1(1st)': c1.s1, 'S2(1st)': c1.s2, 'S3(1st)': c1.s3, 'TOTAL(1st)': c1.total,
+      'BOTTLENECK(1st)': r.bottleneck1,
+      'LINE(2nd)': r.line2, 'CT(s)(2nd)': r.ct2, 'BATT/H(2nd)': c2.battH,
+      'S1(2nd)': c2.s1, 'S2(2nd)': c2.s2, 'S3(2nd)': c2.s3, 'TOTAL(2nd)': c2.total,
+      'BOTTLENECK(2nd)': r.bottleneck2,
+    };
+  });
+  const ws = XLSX.utils.json_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Database PCS');
+  XLSX.writeFile(wb, 'FAH_Database_PCS.xlsx');
+  BPMS.toast('Export berhasil', 'success');
+}
+</script>
+</body>
+</html>

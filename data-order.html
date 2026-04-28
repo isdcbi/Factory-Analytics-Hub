@@ -1,0 +1,1193 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Data Order — Factory Analytics Hub</title>
+  <link rel="stylesheet" href="style.css"/>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <style>
+    /* ── Orders table: scrollable container dengan sticky header ── */
+    .order-table-wrap {
+      overflow: hidden;
+      height: calc(100vh - 324px); /* topbar 52 + padding 24 + actionbar 64 + stats 88 + infobar 50 + buffer 46 */
+    }
+    .order-table-wrap .table-scroll {
+      height: 100%;
+      overflow: auto;
+    }
+
+    /* Auto-fit columns, compact font */
+    #ordersTable {
+      font-size: 12px;
+      table-layout: auto;
+      width: max-content;
+      min-width: 100%;
+    }
+    #ordersTable th, #ordersTable td {
+      padding: 5px 10px;
+      white-space: nowrap;
+    }
+    #ordersTable thead th {
+      font-size: 11px;
+      font-weight: 600;
+      background: var(--bg-2);
+      position: sticky;
+      top: 0;
+      z-index: 3;
+      box-shadow: 0 2px 4px -1px rgba(0,0,0,0.08);
+    }
+
+    /* Column highlights */
+    #ordersTable td:nth-child(8)  { font-family: var(--font-mono,monospace); font-size: 11px; } /* ITEM */
+    #ordersTable td:nth-child(9)  { text-align: right; font-weight: 600; }                      /* Qty */
+    #ordersTable td:nth-child(13) { font-weight: 600; }                                         /* Battery Type */
+    #ordersTable td:last-child    { text-align: center; }
+
+    /* ── Column group colours ─────────────────────────────── */
+    /* Original data dari Excel */
+    #ordersTable th.th-orig, #previewTable th.th-orig { background: var(--bg-2); }
+    /* Hasil kalkulasi parsing ITEM */
+    #ordersTable th.th-calc, #previewTable th.th-calc {
+      background: #fef9c3;
+      color: #854d0e;
+    }
+    #ordersTable td.td-calc, #previewTable td.td-calc {
+      background: #fefce8;
+    }
+
+    /* Preview table: compact juga tapi tanpa fixed height */
+    #previewTable {
+      font-size: 12px;
+      table-layout: auto;
+      width: max-content;
+      min-width: 100%;
+    }
+    #previewTable th, #previewTable td { padding: 5px 10px; white-space: nowrap; }
+    #previewTable th { font-size: 11px; }
+    #previewTable td:nth-child(8)  { font-family: var(--font-mono,monospace); font-size: 11px; }
+    #previewTable td:nth-child(9)  { text-align: right; font-weight: 600; }
+    #previewTable td:nth-child(13) { font-weight: 600; }
+
+    /* ── Tab Navigation ──────────────────────────────────────────── */
+    .do-tabs {
+      display: flex;
+      gap: 2px;
+      border-bottom: 2px solid var(--border-solid2);
+      margin-bottom: 20px;
+    }
+    .do-tab {
+      padding: 8px 18px;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-3);
+      cursor: pointer;
+      border: none;
+      background: none;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -2px;
+      border-radius: 6px 6px 0 0;
+      transition: color var(--transition), background var(--transition), border-color var(--transition);
+      white-space: nowrap;
+    }
+    .do-tab:hover  { color: var(--text-1); background: var(--bg-2); }
+    .do-tab.active { color: var(--accent); border-bottom-color: var(--accent); background: rgba(94,106,210,.06); }
+
+    /* Tab panels */
+    .do-panel { display: none; }
+    .do-panel.active { display: block; }
+
+    /* Generated table */
+    .gen-table-wrap {
+      overflow: hidden;
+      height: calc(100vh - 270px);
+    }
+    .gen-table-wrap .table-scroll { height: 100%; overflow: auto; }
+    #genTable {
+      font-size: 12px;
+      table-layout: auto;
+      width: max-content;
+      min-width: 100%;
+    }
+    #genTable th, #genTable td { padding: 5px 10px; white-space: nowrap; }
+    #genTable thead th {
+      font-size: 11px;
+      font-weight: 600;
+      position: sticky;
+      top: 0;
+      z-index: 3;
+      box-shadow: 0 2px 4px -1px rgba(0,0,0,0.08);
+    }
+    /* Column group colours on generated table */
+    #genTable th.th-orig, #genTable td.td-orig { background: var(--bg-2); }
+    #genTable th.th-spec { background: #e8f0fe; color: #1a3f8f; }
+    #genTable td.td-spec { background: #f0f5ff; }
+    #genTable th.th-calc, #genTable td.td-calc { background: #fef9c3; color: #854d0e; }
+    #genTable td.td-calc { background: #fefce8; }
+    #genTable th.th-pos  { background: #dcfce7; color: #14532d; }
+    #genTable td.td-pos  { background: #f0fdf4; }
+    #genTable th.th-neg  { background: #fee2e2; color: #7f1d1d; }
+    #genTable td.td-neg  { background: #fff5f5; }
+    #genTable td.td-num  { text-align: right; font-variant-numeric: tabular-nums; }
+
+    /* Filter icon on header */
+    .th-filter-order { cursor: pointer; display: inline-flex; align-items: center; gap: 3px; }
+    .filter-icon-order { font-size: 9px; opacity: .5; transition: opacity .15s; }
+    .filter-icon-order.active { opacity: 1; color: var(--accent); }
+    .th-filter-order:hover .filter-icon-order { opacity: 1; }
+
+    /* Order filter dropdown overrides */
+    #orderFilterDropdown { max-width: 340px; max-height: 300px; }
+    #orderFilterDropdown .filter-opt { white-space: nowrap; }
+    #orderFilterDropdown .filter-opt span { overflow: hidden; text-overflow: ellipsis; max-width: 280px; display: block; }
+  </style>
+</head>
+<body>
+<div class="app-layout">
+  <div id="sidebarMount"></div>
+  <div class="main-content">
+    <div id="topbarMount"></div>
+    <div class="page-body">
+
+      <!-- Action Bar (shared) -->
+      <div class="flex items-center gap-3 mb-6 flex-wrap">
+        <div class="period-bar" style="margin-bottom:0">
+          <span class="period-label">Periode:</span>
+          <select id="periodSelect" class="form-control" style="width:auto">
+            <option value="">— Pilih Periode —</option>
+          </select>
+        </div>
+        <div class="ml-auto flex gap-2">
+          <button class="btn btn-ghost btn-sm" id="uploadOrderBtn">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            Upload Data Order
+          </button>
+          <button class="btn btn-danger btn-sm" id="deleteOrdersBtn">Hapus Periode</button>
+        </div>
+      </div>
+
+      <input type="file" id="fileInput" accept=".xlsx,.xls" style="display:none"/>
+
+      <!-- Preview panel (hidden until upload) -->
+      <div id="previewPanel" style="display:none" class="card mb-6">
+        <div class="card-header">
+          <span class="card-title">Preview Data Upload</span>
+          <div class="flex gap-2">
+            <button class="btn btn-ghost btn-sm" id="cancelUpload">Batal</button>
+            <button class="btn btn-primary btn-sm" id="commitUpload">✓ Simpan ke Periode</button>
+          </div>
+        </div>
+        <div id="previewStats" class="flex gap-4 mb-4 text-sm text-muted"></div>
+        <div class="table-wrap">
+          <div class="table-scroll">
+            <table id="previewTable">
+              <thead>
+                <tr>
+                  <th class="th-orig">No</th><th class="th-orig">RFQ</th><th class="th-orig">SO</th>
+                  <th class="th-orig">Sold To</th><th class="th-orig">Ship To</th>
+                  <th class="th-orig">No PO</th><th class="th-orig">PN Customer</th>
+                  <th class="th-orig">ITEM</th><th class="th-orig">Qty</th><th class="th-orig">Type</th>
+                  <th class="th-calc">Tech</th><th class="th-calc">Separator</th>
+                  <th class="th-calc">Battery Type</th><th class="th-calc">Plate</th>
+                  <th class="th-calc">1st Line</th><th class="th-calc">2nd Line</th>
+                </tr>
+              </thead>
+              <tbody id="previewBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Summary Stats -->
+      <div class="stats-grid mb-4" id="orderStats">
+        <div class="stat-card">
+          <div class="stat-label">Total Item</div>
+          <div class="stat-value" id="statTotalItem">—</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Total Qty Order</div>
+          <div class="stat-value" id="statTotalQty">—</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Line Aktif</div>
+          <div class="stat-value" id="statLineAktif">—</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Unmapped</div>
+          <div class="stat-value" id="statUnmapped" style="color:var(--red)">—</div>
+          <div class="stat-sub" id="statUnmappedSub"></div>
+        </div>
+      </div>
+
+      <!-- Tab Navigation -->
+      <nav class="do-tabs" id="doTabs">
+        <button class="do-tab active" data-tab="data-order">Data Order</button>
+        <button class="do-tab"        data-tab="generated">Generated Data Order</button>
+      </nav>
+
+      <!-- ══ Panel: Data Order ══════════════════════════════════════ -->
+      <div id="panel-data-order" class="do-panel active">
+
+      <!-- Orders Table toolbar -->
+      <div class="flex items-center gap-3 mb-3 flex-wrap">
+        <span id="orderCount" class="text-muted text-sm">0 item</span>
+        <div class="flex gap-3" style="font-size:11px;color:var(--text-4)">
+          <span style="display:flex;align-items:center;gap:4px">
+            <span style="width:10px;height:10px;border-radius:2px;background:var(--bg-2);border:1px solid var(--border-solid2);display:inline-block"></span>
+            Data asli (Excel)
+          </span>
+          <span style="display:flex;align-items:center;gap:4px">
+            <span style="width:10px;height:10px;border-radius:2px;background:#fef9c3;border:1px solid #fde68a;display:inline-block"></span>
+            Hasil parsing ITEM
+          </span>
+        </div>
+        <div class="ml-auto flex gap-2">
+          <input type="text" id="searchInput" class="form-control" placeholder="Cari item/SO..." style="width:200px"/>
+          <button class="btn btn-ghost btn-sm" id="exportRawBtn">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Export Raw
+          </button>
+        </div>
+      </div>
+      <div class="table-wrap order-table-wrap">
+        <div class="table-scroll">
+          <table id="ordersTable">
+            <thead id="ordersHead">
+              <tr>
+                <th>No</th><th>RFQ</th><th>SO</th><th>Sold To</th><th>Ship To</th>
+                <th>No PO</th><th>PN Customer</th><th>ITEM</th><th>Qty</th><th>Type</th>
+                <th>Tech</th><th>Separator</th><th>Battery Type</th><th>Plate</th>
+                <th>Aksi</th>
+              </tr>
+            </thead>
+            <tbody id="ordersBody">
+              <tr><td colspan="15"><div class="empty-state">
+                <div class="empty-icon">📋</div>
+                <div class="empty-title">Belum ada data order</div>
+              </div></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div><!-- end orders table wrap -->
+      </div><!-- end panel-data-order -->
+
+      <!-- ══ Panel: Generated Data Order ═══════════════════════════ -->
+      <div id="panel-generated" class="do-panel">
+
+        <!-- Generated toolbar -->
+        <div class="flex items-center gap-3 mb-3">
+          <span id="genCount" class="text-muted text-sm">0 item</span>
+          <div class="ml-auto flex gap-2">
+            <input type="text" id="genSearch" class="form-control" placeholder="Cari..." style="width:200px"/>
+            <button class="btn btn-ghost btn-sm" id="exportGenBtn">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              Export Generated Data
+            </button>
+          </div>
+        </div>
+
+        <!-- Generated table -->
+        <div class="table-wrap gen-table-wrap">
+          <div class="table-scroll">
+            <table id="genTable">
+              <thead>
+                <tr>
+                  <th class="th-orig">No</th>
+                  <th class="th-orig">Periode</th>
+                  <th class="th-orig">PN Customer</th>
+                  <th class="th-orig">ITEM</th>
+                  <th class="th-orig">Qty Produksi</th>
+                  <th class="th-spec">Spec Code</th>
+                  <th class="th-calc">Tech</th>
+                  <th class="th-calc">Separator</th>
+                  <th class="th-calc">Battery Type</th>
+                  <th class="th-calc">Plate</th>
+                  <th class="th-calc">1st Line</th>
+                  <th class="th-calc">2nd Line</th>
+                  <th class="th-pos">Item Data Infor</th>
+                  <th class="th-pos">PN Plate Positif</th>
+                  <th class="th-pos">Grid Process Plate Positif</th>
+                  <th class="th-pos">Qty Plate Positif</th>
+                  <th class="th-pos">Qty Pule Plate Positif</th>
+                  <th class="th-neg">PN Plate Negatif</th>
+                  <th class="th-neg">Grid Process Plate Negatif</th>
+                  <th class="th-neg">Qty Plate Negatif</th>
+                  <th class="th-neg">Qty Pule Plate Negatif</th>
+                </tr>
+              </thead>
+              <tbody id="genBody">
+                <tr><td colspan="21"><div class="empty-state">
+                  <div class="empty-icon">📊</div>
+                  <div class="empty-title">Pilih periode untuk melihat Generated Data</div>
+                </div></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div><!-- end panel-generated -->
+
+    </div>
+  </div>
+</div>
+
+<!-- Order Column Filter Dropdown -->
+<div id="orderFilterDropdown" class="col-filter-dropdown" style="display:none">
+  <input class="filter-search" id="orderFilterSearch" placeholder="Cari..."/>
+  <div class="filter-list" id="orderFilterList"></div>
+  <div class="filter-actions">
+    <button class="btn btn-xs btn-ghost" id="orderFilterSelectAll">Semua</button>
+    <button class="btn btn-xs btn-ghost" id="orderFilterClearAll">Hapus</button>
+    <button class="btn btn-xs btn-primary ml-auto" id="orderFilterApply">Terapkan</button>
+  </div>
+</div>
+
+<!-- Upload Order Modal -->
+<div id="uploadModal" style="display:none;position:fixed;inset:0;z-index:100;background:rgba(0,0,0,0.35);align-items:center;justify-content:center">
+  <div style="background:var(--bg-1);border:1px solid var(--border-solid2);border-radius:12px;padding:28px;width:480px;max-width:95vw;box-shadow:0 8px 32px rgba(0,0,0,0.15)">
+
+    <!-- Header -->
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+      <div>
+        <div style="font-size:15px;font-weight:600;color:var(--text-1)">Upload Data Order</div>
+        <div class="text-muted text-sm" style="margin-top:2px">Pilih periode lalu upload file Excel</div>
+      </div>
+      <button class="btn btn-ghost btn-xs" id="closeUploadModal">✕</button>
+    </div>
+
+    <!-- Period selector: BULAN + TAHUN -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px">
+      <div>
+        <label class="form-label">Bulan</label>
+        <select id="modalMonth" class="form-control" style="width:100%">
+          <option value="01">Januari</option>
+          <option value="02">Februari</option>
+          <option value="03">Maret</option>
+          <option value="04">April</option>
+          <option value="05">Mei</option>
+          <option value="06">Juni</option>
+          <option value="07">Juli</option>
+          <option value="08">Agustus</option>
+          <option value="09">September</option>
+          <option value="10">Oktober</option>
+          <option value="11">November</option>
+          <option value="12">Desember</option>
+        </select>
+      </div>
+      <div>
+        <label class="form-label">Tahun</label>
+        <div style="display:flex;align-items:center;gap:0">
+          <input id="modalYear" class="form-control" style="text-align:center;font-weight:600;border-radius:6px 0 0 6px;border-right:none" type="number" min="2020" max="2099" step="1"/>
+          <div style="display:flex;flex-direction:column;border:1px solid var(--border-solid2);border-radius:0 6px 6px 0;overflow:hidden">
+            <button id="yearUp"   style="padding:3px 8px;background:var(--bg-2);border:none;border-bottom:1px solid var(--border-solid2);cursor:pointer;font-size:9px;color:var(--text-3);line-height:1" onmouseover="this.style.background='var(--bg-3)'" onmouseout="this.style.background='var(--bg-2)'">▲</button>
+            <button id="yearDown" style="padding:3px 8px;background:var(--bg-2);border:none;cursor:pointer;font-size:9px;color:var(--text-3);line-height:1" onmouseover="this.style.background='var(--bg-3)'" onmouseout="this.style.background='var(--bg-2)'">▼</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Drop zone -->
+    <div id="modalDropZone" style="border:2px dashed var(--border-solid2);border-radius:8px;padding:32px 16px;text-align:center;cursor:pointer;transition:border-color .15s,background .15s">
+      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="opacity:.4;margin:0 auto 10px"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+      <div style="font-size:13px;font-weight:500;color:var(--text-2)">Klik atau drag file Excel ke sini</div>
+      <div style="font-size:11px;color:var(--text-4);margin-top:4px">.xlsx / .xls</div>
+    </div>
+
+    <div style="text-align:right;margin-top:16px">
+      <button class="btn btn-ghost btn-sm" id="cancelUploadModal">Batal</button>
+    </div>
+  </div>
+</div>
+
+<script src="shared-components.js"></script>
+<script>
+let currentPeriod    = '';
+let pendingData      = [];
+let orderColFilters  = {};   // key -> Set of selected values
+let activeOrderKey   = null;
+
+function pageInit() {
+  document.getElementById('topbarMount').innerHTML = BPMS.renderTopbar('Data Order');
+
+  // Tab switching
+  document.getElementById('doTabs').addEventListener('click', e => {
+    const btn = e.target.closest('.do-tab');
+    if (!btn) return;
+    document.querySelectorAll('.do-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.do-panel').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('panel-' + btn.dataset.tab).classList.add('active');
+    if (btn.dataset.tab === 'generated') renderGenerated();
+  });
+
+  populatePeriods();
+
+  const sel = document.getElementById('periodSelect');
+  sel.addEventListener('change', () => {
+    currentPeriod = sel.value;
+    renderOrders();
+    const activeTab = document.querySelector('.do-tab.active')?.dataset.tab;
+    if (activeTab === 'generated') renderGenerated();
+  });
+
+  const current = BPMS.getCurrentPeriod();
+  if (BPMS.getPeriods().includes(current)) {
+    sel.value = current; currentPeriod = current; renderOrders();
+  }
+
+  // Upload modal
+  document.getElementById('uploadOrderBtn').addEventListener('click', openUploadModal);
+  document.getElementById('closeUploadModal').addEventListener('click', closeUploadModal);
+  document.getElementById('cancelUploadModal').addEventListener('click', closeUploadModal);
+  document.getElementById('uploadModal').addEventListener('click', e => { if (e.target === e.currentTarget) closeUploadModal(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeUploadModal(); });
+  document.getElementById('yearUp').addEventListener('click', () => {
+    const el = document.getElementById('modalYear');
+    el.value = Math.min(2099, (parseInt(el.value) || new Date().getFullYear()) + 1);
+  });
+  document.getElementById('yearDown').addEventListener('click', () => {
+    const el = document.getElementById('modalYear');
+    el.value = Math.max(2020, (parseInt(el.value) || new Date().getFullYear()) - 1);
+  });
+
+  const dropZone = document.getElementById('modalDropZone');
+  const input    = document.getElementById('fileInput');
+  dropZone.addEventListener('click', () => input.click());
+  dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.style.borderColor = 'var(--accent)'; dropZone.style.background = 'rgba(94,106,210,.05)'; });
+  dropZone.addEventListener('dragleave', () => { dropZone.style.borderColor = ''; dropZone.style.background = ''; });
+  dropZone.addEventListener('drop', e => {
+    e.preventDefault(); dropZone.style.borderColor = ''; dropZone.style.background = '';
+    const p = getModalPeriod();
+    if (!p) { BPMS.toast('Pilih periode terlebih dahulu', 'error'); return; }
+    applyModalPeriod(p);
+    closeUploadModal();
+    handleFile(e.dataTransfer.files[0]);
+  });
+  input.addEventListener('change', () => {
+    const p = getModalPeriod();
+    if (!p) { BPMS.toast('Pilih periode terlebih dahulu', 'error'); return; }
+    applyModalPeriod(p);
+    closeUploadModal();
+    handleFile(input.files[0]);
+    input.value = '';
+  });
+
+  document.getElementById('cancelUpload').addEventListener('click', () => {
+    pendingData = [];
+    document.getElementById('previewPanel').style.display = 'none';
+  });
+  document.getElementById('commitUpload').addEventListener('click', commitUpload);
+  document.getElementById('exportRawBtn').addEventListener('click', exportRaw);
+  document.getElementById('exportGenBtn').addEventListener('click', exportGenerated);
+  document.getElementById('genSearch').addEventListener('input', renderGenerated);
+  document.getElementById('deleteOrdersBtn').addEventListener('click', deletePeriod);
+  document.getElementById('searchInput').addEventListener('input', renderOrders);
+
+  // Column filter wiring
+  document.getElementById('orderFilterApply').addEventListener('click', () => { closeOrderFilter(); renderOrders(); });
+  document.getElementById('orderFilterSelectAll').addEventListener('click', () =>
+    document.querySelectorAll('#orderFilterList input[type=checkbox]').forEach(cb => cb.checked = true));
+  document.getElementById('orderFilterClearAll').addEventListener('click', () =>
+    document.querySelectorAll('#orderFilterList input[type=checkbox]').forEach(cb => cb.checked = false));
+  document.getElementById('orderFilterSearch').addEventListener('input', e => {
+    const q = e.target.value.toLowerCase();
+    document.querySelectorAll('#orderFilterList .filter-opt').forEach(opt =>
+      opt.style.display = opt.textContent.toLowerCase().includes(q) ? '' : 'none');
+  });
+  document.getElementById('orderFilterDropdown').addEventListener('click', e => e.stopPropagation());
+  document.addEventListener('click', () => closeOrderFilter());
+}
+
+// ── Upload Modal ─────────────────────────────────────────────────
+
+function openUploadModal() {
+  const now = new Date();
+  // Pre-fill dari currentPeriod jika ada, jika tidak pakai bulan/tahun sekarang
+  if (currentPeriod) {
+    const [y, m] = currentPeriod.split('-');
+    document.getElementById('modalMonth').value = m;
+    document.getElementById('modalYear').value  = y;
+  } else {
+    document.getElementById('modalMonth').value = String(now.getMonth() + 1).padStart(2, '0');
+    document.getElementById('modalYear').value  = now.getFullYear();
+  }
+  document.getElementById('uploadModal').style.display = 'flex';
+}
+
+function closeUploadModal() {
+  document.getElementById('uploadModal').style.display = 'none';
+}
+
+function getModalPeriod() {
+  const month = document.getElementById('modalMonth').value;
+  const year  = String(parseInt(document.getElementById('modalYear').value) || 0);
+  if (!month || year.length < 4) return '';
+  return `${year}-${month}`;
+}
+
+function applyModalPeriod(p) {
+  // Pastikan periode ada di state
+  const state = BPMS.getState();
+  if (!state.orders[p]) {
+    state.orders[p] = [];
+    BPMS.initCalendarForPeriod(p);
+    BPMS.initCapacityForPeriod(p);
+  }
+  currentPeriod = p;
+  populatePeriods();
+  document.getElementById('periodSelect').value = p;
+}
+
+function populatePeriods() {
+  const sel     = document.getElementById('periodSelect');
+  const current = sel.value;
+  sel.innerHTML = '<option value="">-- Semua Periode --</option>';
+  BPMS.getPeriods().forEach(p => {
+    const opt = document.createElement('option');
+    opt.value       = p;
+    opt.textContent = BPMS.formatPeriod(p);
+    sel.appendChild(opt);
+  });
+  if (current) sel.value = current;
+}
+
+function addPeriod(val) {
+  if (!val) return;
+  const state = BPMS.getState();
+  if (!state.orders[val]) state.orders[val] = [];
+  BPMS.initCalendarForPeriod(val);
+  BPMS.initCapacityForPeriod(val);
+  BPMS.saveState();
+  populatePeriods();
+  document.getElementById('periodSelect').value = val;
+  currentPeriod = val;
+  renderOrders();
+}
+
+function deletePeriod() {
+  if (!currentPeriod) return;
+  if (!confirm(`Hapus semua data order periode ${BPMS.formatPeriod(currentPeriod)}?`)) return;
+  const state = BPMS.getState();
+  delete state.orders[currentPeriod];
+  currentPeriod = '';
+  BPMS.saveState();
+  populatePeriods();
+  renderOrders();
+  BPMS.toast('Periode dihapus', 'info');
+}
+
+// ── File Import ──────────────────────────────────────────────────
+
+const HEADER_MAP = {
+  no:         ['No','NO','no'],
+  rfq:        ['RFQ','rfq'],
+  so:         ['SO','so'],
+  soldTo:     ['Sold To','SOLD TO','Sold_To','SoldTo'],
+  shipTo:     ['Ship To','SHIP TO','Ship_To','ShipTo'],
+  noPo:       ['No PO','NO PO','No_PO','NoPO'],
+  pnCustomer: ['PN Customer','PN CUSTOMER','PN_Customer'],
+  item:       ['PN Infor (ITEM)','PN Infor','ITEM','Item','PN_INFOR','PN INFOR (ITEM)'],
+  qty:        ['Qty','QTY','qty','Quantity'],
+  type:       ['Type','TYPE','type'],
+};
+
+function findCol(obj, aliases) {
+  const keys = Object.keys(obj);
+  for (const a of aliases) {
+    const k = keys.find(k => k.trim().toUpperCase() === a.toUpperCase());
+    if (k !== undefined) return obj[k];
+  }
+  return '';
+}
+
+function handleFile(file) {
+  if (!file) return;
+  // Periode sudah di-set dari modal sebelum closeUploadModal dipanggil
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const wb   = XLSX.read(e.target.result, { type: 'binary' });
+      const ws   = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
+
+      const parsed = rows.map(row => {
+        const qty  = Number(findCol(row, HEADER_MAP.qty));
+        const item = String(findCol(row, HEADER_MAP.item)).trim();
+        if (qty <= 0 || !item) return null;
+        const soldTo = String(findCol(row, HEADER_MAP.soldTo));
+        if (soldTo.toLowerCase().includes('total')) return null;
+
+        const p = BPMS.parseItemString(item) || {};
+        return {
+          no:         findCol(row, HEADER_MAP.no),
+          rfq:        String(findCol(row, HEADER_MAP.rfq)),
+          so:         String(findCol(row, HEADER_MAP.so)),
+          soldTo,
+          shipTo:     String(findCol(row, HEADER_MAP.shipTo)),
+          noPo:       String(findCol(row, HEADER_MAP.noPo)),
+          pnCustomer: String(findCol(row, HEADER_MAP.pnCustomer)),
+          item,
+          qty,
+          type:       String(findCol(row, HEADER_MAP.type)),
+          _parsed:    p,
+        };
+      }).filter(Boolean);
+
+      if (!parsed.length) { BPMS.toast('Tidak ada data valid', 'error'); return; }
+
+      pendingData = parsed;
+      showPreview(parsed);
+    } catch(err) {
+      BPMS.toast('Gagal membaca file: ' + err.message, 'error');
+    }
+  };
+  reader.readAsBinaryString(file);
+  document.getElementById('fileInput').value = '';
+}
+
+function showPreview(data) {
+  const totalQty = data.reduce((s, r) => s + r.qty, 0);
+  document.getElementById('previewStats').innerHTML =
+    `<span>${data.length} item</span> · <span>Total Qty: ${totalQty.toLocaleString()}</span>`;
+
+  document.getElementById('previewBody').innerHTML = data.map((r, i) => {
+    const p = r._parsed || {};
+    const pcsMatch = p.battType ? BPMS.findPCSMatches(p.battType, p.tech, p.plate, p.separator)[0] : null;
+    const l1Badge = pcsMatch?.line1 ? `<span class="badge badge-neutral">${pcsMatch.line1}</span>` : '<span class="text-muted">—</span>';
+    const l2Badge = pcsMatch?.line2 ? `<span class="badge badge-neutral">${pcsMatch.line2}</span>` : '<span class="text-muted">—</span>';
+    return `<tr>
+      <td>${i + 1}</td><td>${r.rfq}</td><td>${r.so}</td>
+      <td>${r.soldTo}</td><td>${r.shipTo}</td><td>${r.noPo}</td>
+      <td>${r.pnCustomer}</td>
+      <td class="font-mono" style="font-size:11px">${r.item}</td>
+      <td style="text-align:right"><strong>${r.qty.toLocaleString()}</strong></td>
+      <td>${r.type}</td>
+      <td class="td-calc"><span class="badge badge-neutral">${p.tech || '—'}</span></td>
+      <td class="td-calc">${p.separator || '—'}</td>
+      <td class="td-calc"><strong>${p.battType || '—'}</strong></td>
+      <td class="td-calc">${p.plate || '—'}</td>
+      <td class="td-calc" style="text-align:center">${l1Badge}</td>
+      <td class="td-calc" style="text-align:center">${l2Badge}</td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('previewPanel').style.display = '';
+}
+
+function commitUpload() {
+  if (!pendingData.length || !currentPeriod) return;
+  BPMS.getState().orders[currentPeriod] = pendingData;
+  BPMS.saveState().then(() => {
+    BPMS.toast(`${pendingData.length} order disimpan ke ${BPMS.formatPeriod(currentPeriod)}`, 'success');
+    pendingData = [];
+    document.getElementById('previewPanel').style.display = 'none';
+    renderOrders();
+    const activeTab = document.querySelector('.do-tab.active')?.dataset.tab;
+    if (activeTab === 'generated') renderGenerated();
+  });
+}
+
+// ── Column Filter ────────────────────────────────────────────────
+
+function getOrderValue(row, key) {
+  const p = row._parsed || {};
+  switch (key) {
+    case 'item':      return String(row.item       || '');
+    case 'rfq':       return String(row.rfq       || '');
+    case 'so':        return String(row.so        || '');
+    case 'soldTo':    return String(row.soldTo    || '');
+    case 'shipTo':    return String(row.shipTo    || '');
+    case 'type':      return String(row.type      || '');
+    case 'tech':      return String(p.tech        || '');
+    case 'separator': return String(p.separator   || '');
+    case 'battType':  return String(p.battType    || '');
+    case 'plate':     return String(p.plate       || '');
+    case 'line1':     return String(row._line1    || '');
+    case 'line2':     return String(row._line2    || '');
+    default:          return '';
+  }
+}
+
+function openOrderFilter(key, triggerEl) {
+  activeOrderKey = key;
+  const state = BPMS.getState();
+
+  // Collect all rows for this period selection
+  let allOrders = [];
+  if (!currentPeriod) {
+    BPMS.getPeriods().forEach(p => {
+      (state.orders?.[p] || []).forEach(r => allOrders.push({ ...r, _period: p }));
+    });
+  } else {
+    allOrders = (state.orders?.[currentPeriod] || []).map(r => ({ ...r, _period: currentPeriod }));
+  }
+  // Ensure PCS lines are computed on this local copy
+  allOrders.forEach(r => {
+    if (r._linesComputed) return;
+    const p = r._parsed || {};
+    const m = p.battType ? BPMS.findPCSMatches(p.battType, p.tech, p.plate, p.separator)[0] : null;
+    r._line1 = m?.line1 || '';
+    r._line2 = m?.line2 || '';
+    r._linesComputed = true;
+  });
+
+  const vals = [...new Set(allOrders.map(r => getOrderValue(r, key)))].sort();
+  const sel  = orderColFilters[key] || new Set(vals); // default: all selected
+
+  document.getElementById('orderFilterSearch').value = '';
+  document.getElementById('orderFilterList').innerHTML = vals.map(v =>
+    `<label class="filter-opt">
+      <input type="checkbox" value="${v.replace(/"/g, '&quot;')}"${sel.has(v) ? ' checked' : ''}/>
+      <span>${v || '<em style="color:var(--text-4)">Kosong</em>'}</span>
+    </label>`
+  ).join('');
+
+  // Position dropdown snapped to left edge of the <th> cell
+  const dropdown = document.getElementById('orderFilterDropdown');
+  dropdown.style.display = 'flex';
+  const thEl = triggerEl.closest('th') || triggerEl;
+  const rect  = thEl.getBoundingClientRect();
+  const ddW   = Math.max(220, rect.width);
+  let left    = rect.left;
+  const top   = rect.bottom + 4;
+  if (left + ddW > window.innerWidth - 8) left = window.innerWidth - ddW - 8;
+  dropdown.style.left     = left + 'px';
+  dropdown.style.top      = top  + 'px';
+  dropdown.style.minWidth = ddW  + 'px';
+
+  document.getElementById('orderFilterSearch').focus();
+}
+
+function closeOrderFilter() {
+  if (!activeOrderKey) return;
+  const checkboxes = [...document.querySelectorAll('#orderFilterList input[type=checkbox]')];
+  if (checkboxes.length) {
+    const checked = new Set(checkboxes.filter(cb => cb.checked).map(cb => cb.value));
+    // If everything is checked → no active filter (remove entry)
+    if (checked.size === checkboxes.length) {
+      delete orderColFilters[activeOrderKey];
+    } else {
+      orderColFilters[activeOrderKey] = checked;
+    }
+  }
+  document.getElementById('orderFilterDropdown').style.display = 'none';
+  activeOrderKey = null;
+}
+
+// ── Render Orders ────────────────────────────────────────────────
+
+function renderOrders() {
+  const body  = document.getElementById('ordersBody');
+  const q     = document.getElementById('searchInput').value.toLowerCase();
+  const state = BPMS.getState();
+
+  // Kumpulkan order: semua periode atau periode terpilih
+  let allOrders;
+  if (!currentPeriod) {
+    // Semua periode — gabungkan dengan info periode
+    allOrders = [];
+    BPMS.getPeriods().forEach(p => {
+      (state.orders?.[p] || []).forEach(r => allOrders.push({ ...r, _period: p }));
+    });
+  } else {
+    allOrders = (state.orders?.[currentPeriod] || []).map(r => ({ ...r, _period: currentPeriod }));
+  }
+
+  // Pre-compute PCS lookup sekali per row
+  allOrders.forEach(r => {
+    if (r._linesComputed) return;
+    const p = r._parsed || {};
+    const m = p.battType ? BPMS.findPCSMatches(p.battType, p.tech, p.plate, p.separator)[0] : null;
+    r._line1 = m?.line1 || '';
+    r._line2 = m?.line2 || '';
+    r._linesComputed = true;
+  });
+
+  const filtered = allOrders.filter(r => {
+    if (q && !JSON.stringify(r).toLowerCase().includes(q)) return false;
+    for (const [key, sel] of Object.entries(orderColFilters)) {
+      if (!sel.size) continue;
+      if (!sel.has(getOrderValue(r, key))) return false;
+    }
+    return true;
+  });
+
+  document.getElementById('orderCount').textContent = `${filtered.length} / ${allOrders.length} item`;
+
+  if (!filtered.length) {
+    ['statTotalItem','statTotalQty','statLineAktif','statUnmapped'].forEach(id => {
+      document.getElementById(id).textContent = '—';
+    });
+    document.getElementById('statUnmapped').style.color = '';
+    document.getElementById('statUnmappedSub').textContent = '';
+    body.innerHTML = `<tr><td colspan="17"><div class="empty-state">
+      <div class="empty-icon">📋</div>
+      <div class="empty-title">${allOrders.length ? 'Tidak ada hasil pencarian' : 'Belum ada data order'}</div>
+      ${!allOrders.length ? '<div class="empty-text">Upload file Excel menggunakan tombol di atas</div>' : ''}
+    </div></td></tr>`;
+    return;
+  }
+
+  // ── Hitung stats ──────────────────────────────────────────────
+  const totalQty   = filtered.reduce((s, r) => s + (r.qty || 0), 0);
+  let   unmapped   = 0;
+  const activeLines = new Set();
+  filtered.forEach(r => {
+    if (!r._line1 && !r._line2) { unmapped++; return; }
+    if (r._line1) activeLines.add(r._line1);
+    if (r._line2) activeLines.add(r._line2);
+  });
+  document.getElementById('statTotalItem').textContent  = filtered.length.toLocaleString();
+  document.getElementById('statTotalQty').textContent   = totalQty.toLocaleString();
+  document.getElementById('statLineAktif').textContent  = activeLines.size || '—';
+  document.getElementById('statUnmapped').textContent   = unmapped;
+  document.getElementById('statUnmapped').style.color   = unmapped > 0 ? 'var(--red)' : 'var(--green)';
+  document.getElementById('statUnmappedSub').textContent = unmapped > 0 ? 'Tidak ditemukan di PCS' : 'Semua terpetakan';
+
+  const showPeriodCol = !currentPeriod;
+  const o = 'class="th-orig"', c = 'class="th-calc"';
+  const fi = key => {
+    const active = orderColFilters[key]?.size < [...new Set(allOrders.map(r => getOrderValue(r, key)))].length;
+    return `<span class="th-filter-order" data-key="${key}" onclick="openOrderFilter('${key}',this);event.stopPropagation()">
+      <span class="filter-icon-order${active ? ' active' : ''}" data-key="${key}">▾</span>
+    </span>`;
+  };
+  const periodTh = showPeriodCol ? `<th ${o}>Periode</th>` : '';
+  document.getElementById('ordersHead').innerHTML =
+    `<tr>${periodTh}
+      <th ${o}>No</th>
+      <th ${o}>RFQ ${fi('rfq')}</th>
+      <th ${o}>SO ${fi('so')}</th>
+      <th ${o}>Sold To ${fi('soldTo')}</th>
+      <th ${o}>Ship To ${fi('shipTo')}</th>
+      <th ${o}>No PO</th>
+      <th ${o}>PN Customer</th>
+      <th ${o}>ITEM ${fi('item')}</th>
+      <th ${o}>Qty</th>
+      <th ${o}>Type ${fi('type')}</th>
+      <th ${c}>Tech ${fi('tech')}</th>
+      <th ${c}>Separator ${fi('separator')}</th>
+      <th ${c}>Battery Type ${fi('battType')}</th>
+      <th ${c}>Plate ${fi('plate')}</th>
+      <th ${c}>1st Line ${fi('line1')}</th>
+      <th ${c}>2nd Line ${fi('line2')}</th>
+    </tr>`;
+
+  body.innerHTML = filtered.map((r, i) => {
+    const p   = r._parsed || {};
+    const per = r._period;
+    const periodOrders = state.orders?.[per] || [];
+    const idx = periodOrders.indexOf(periodOrders.find(o => o === r || (o.item === r.item && o.so === r.so && o.qty === r.qty)));
+
+    const l1Badge = r._line1 ? `<span class="badge badge-neutral">${r._line1}</span>` : '<span class="text-muted">—</span>';
+    const l2Badge = r._line2 ? `<span class="badge badge-neutral">${r._line2}</span>` : '<span class="text-muted">—</span>';
+
+    return `<tr>
+      ${showPeriodCol ? `<td><span class="badge badge-neutral">${BPMS.formatPeriod(per)}</span></td>` : ''}
+      <td class="text-muted">${i + 1}</td>
+      <td>${r.rfq}</td>
+      <td>${r.so}</td>
+      <td>${r.soldTo}</td>
+      <td>${r.shipTo}</td>
+      <td>${r.noPo}</td>
+      <td>${r.pnCustomer}</td>
+      <td class="font-mono" style="font-size:11px">${r.item}</td>
+      <td style="text-align:right"><strong>${r.qty.toLocaleString()}</strong></td>
+      <td>${r.type}</td>
+      <td class="td-calc"><span class="badge badge-neutral">${p.tech || '—'}</span></td>
+      <td class="td-calc">${p.separator || '—'}</td>
+      <td class="td-calc"><strong>${p.battType || '—'}</strong></td>
+      <td class="td-calc">${p.plate || '—'}</td>
+      <td class="td-calc" style="text-align:center">${l1Badge}</td>
+      <td class="td-calc" style="text-align:center">${l2Badge}</td>
+    </tr>`;
+  }).join('');
+}
+
+function deleteOrder(period, idx) {
+  const orders = BPMS.getState().orders?.[period];
+  if (!orders || idx < 0) return;
+  orders.splice(idx, 1);
+  BPMS.saveState();
+  renderOrders();
+}
+
+// ── Generated Data Order ──────────────────────────────────────────
+
+function findColKey(rowSample, ...patterns) {
+  const keys = Object.keys(rowSample);
+  for (const pat of patterns) {
+    const k = keys.find(k => k.trim().toLowerCase() === pat.toLowerCase());
+    if (k) return k;
+  }
+  for (const pat of patterns) {
+    const k = keys.find(k => k.trim().toLowerCase().includes(pat.toLowerCase()));
+    if (k) return k;
+  }
+  return null;
+}
+
+function buildLookupMaps() {
+  const state = BPMS.getState();
+
+  // Data Plate Infor: lookup by named column "Item Data Infor"
+  const plateMap = new Map();
+  const plateRows = state.dbPlateInfor || [];
+  if (plateRows.length) {
+    const s    = plateRows[0];
+    const vals = Object.keys(s);
+    const kKey = findColKey(s, 'Item Data Infor', 'ItemDataInfor')  || vals[1];
+    const kPnP = findColKey(s, 'PN Plate Positif', 'PN Positif')    || vals[2];
+    const kQtP = findColKey(s, 'Qty Plate Positif', 'Qty Positif')  || vals[3];
+    const kPnN = findColKey(s, 'PN Plate Negatif', 'PN Negatif')    || vals[4];
+    const kQtN = findColKey(s, 'Qty Plate Negatif', 'Qty Negatif')  || vals[5];
+    plateRows.forEach(row => {
+      const key = String(row[kKey] ?? '').trim();
+      if (!key) return;
+      plateMap.set(key, {
+        pnPos : String(row[kPnP] ?? ''),
+        qtyPos: Number(row[kQtP]) || 0,
+        pnNeg : String(row[kPnN] ?? ''),
+        qtyNeg: Number(row[kQtN]) || 0,
+      });
+    });
+  }
+
+  // Data Type Plate: lookup Grid Process by named column
+  const typeMap = new Map();
+  const typeRows = state.dbTypePlate || [];
+  if (typeRows.length) {
+    const s     = typeRows[0];
+    const vals  = Object.keys(s);
+    const kCode = findColKey(s, 'Type Plate', 'type plate', 'Code') || vals[2];
+    const kGrid = findColKey(s, 'Grid Process', 'Grid')            || vals[3];
+    typeRows.forEach(row => {
+      const key = String(row[kCode] ?? '').trim();
+      if (key) typeMap.set(key, String(row[kGrid] ?? ''));
+    });
+  }
+
+  // Data PuLe: lookup ratio by named column
+  const puLeMap = new Map();
+  const puLeRows = state.dbPuLe || [];
+  if (puLeRows.length) {
+    const s      = puLeRows[0];
+    const vals   = Object.keys(s);
+    const kPN    = findColKey(s, 'PN Plate Infor', 'PN Plate', 'PN') || vals[2];
+    const kRatio = findColKey(s, 'Qty Pule/Plate (kg)', 'Qty Pule/Plate', 'Qty Pule') || vals[4];
+    puLeRows.forEach(row => {
+      const key = String(row[kPN] ?? '').trim();
+      if (key) puLeMap.set(key, Number(row[kRatio]) || 0);
+    });
+  }
+
+  return { plateMap, typeMap, puLeMap };
+}
+
+function puleKey(pn) {
+  // Jika digit ke-3 = "F", ganti 7 huruf pertama dengan "W-UNPL-", sisanya tetap
+  return pn.charAt(2) === 'F' ? 'W-UNPL-' + pn.substring(7) : pn;
+}
+
+function computeGenRow(r, maps) {
+  const { plateMap, typeMap, puLeMap } = maps;
+  const p    = r._parsed || {};
+  const item = r.item || '';
+  const qty  = r.qty  || 0;
+
+  // Spec Code: MID(item, 5, 1)
+  const specCode = item.charAt(4);
+
+  // Item Data Infor: MID(item, 3, 17)
+  const itemDataInfor = item.substring(2, 19);
+
+  // Lookup Plate Infor by named column
+  const pv    = plateMap.get(itemDataInfor) || {};
+  const pnPos = pv.pnPos  || '';
+  const qpPos = (pv.qtyPos || 0) * qty;
+  const pnNeg = pv.pnNeg  || '';
+  const qpNeg = (pv.qtyNeg || 0) * qty;
+
+  // Grid Process: MID(pn, 8, 4) → lookup TypePlate!C:D
+  const gridPos = typeMap.get(pnPos.substring(7, 11)) ?? '';
+  const gridNeg = typeMap.get(pnNeg.substring(7, 11)) ?? '';
+
+  // Qty Pule: IFERROR(VLOOKUP(puleKey(pn), PuLe!C:E, 3), 0) × qtyPlate
+  const qPulePos = Math.round((puLeMap.get(puleKey(pnPos)) || 0) * qpPos);
+  const qPuleNeg = Math.round((puLeMap.get(puleKey(pnNeg)) || 0) * qpNeg);
+
+  return { specCode, itemDataInfor, pnPos, gridPos, qpPos, qPulePos, pnNeg, gridNeg, qpNeg, qPuleNeg,
+           tech: p.tech || '', separator: p.separator || '', battType: p.battType || '',
+           plate: p.plate || '', line1: r._line1 || '', line2: r._line2 || '' };
+}
+
+function renderGenerated() {
+  const state = BPMS.getState();
+  const body  = document.getElementById('genBody');
+  const q     = document.getElementById('genSearch').value.toLowerCase();
+
+  // Collect orders
+  let allOrders = [];
+  if (!currentPeriod) {
+    BPMS.getPeriods().forEach(p => {
+      (state.orders?.[p] || []).forEach(r => allOrders.push({ ...r, _period: p }));
+    });
+  } else {
+    allOrders = (state.orders?.[currentPeriod] || []).map(r => ({ ...r, _period: currentPeriod }));
+  }
+
+  // Ensure PCS lines computed
+  allOrders.forEach(r => {
+    if (r._linesComputed) return;
+    const p = r._parsed || {};
+    const m = p.battType ? BPMS.findPCSMatches(p.battType, p.tech, p.plate, p.separator)[0] : null;
+    r._line1 = m?.line1 || '';
+    r._line2 = m?.line2 || '';
+    r._linesComputed = true;
+  });
+
+  if (!allOrders.length) {
+    document.getElementById('genCount').textContent = '0 item';
+    body.innerHTML = `<tr><td colspan="21"><div class="empty-state">
+      <div class="empty-icon">📊</div>
+      <div class="empty-title">Belum ada data order</div>
+      <div class="empty-text">Upload file Excel menggunakan tombol di atas</div>
+    </div></td></tr>`;
+    return;
+  }
+
+  const maps = buildLookupMaps();
+  const showPeriod = !currentPeriod;
+
+  const filtered = q
+    ? allOrders.filter(r => JSON.stringify(r).toLowerCase().includes(q))
+    : allOrders;
+
+  document.getElementById('genCount').textContent = `${filtered.length} / ${allOrders.length} item`;
+
+  const num = v => (v === 0 ? '0' : (Math.round(v * 1000) / 1000).toLocaleString('id-ID', { maximumFractionDigits: 3 }));
+  const dash = v => v || '<span class="text-muted">—</span>';
+
+  body.innerHTML = filtered.map((r, i) => {
+    const g = computeGenRow(r, maps);
+    const per = showPeriod ? `<td class="td-orig"><span class="badge badge-neutral">${BPMS.formatPeriod(r._period)}</span></td>` : `<td class="td-orig">${BPMS.formatPeriod(r._period)}</td>`;
+    return `<tr>
+      <td class="td-orig text-muted">${i + 1}</td>
+      ${per}
+      <td class="td-orig">${r.pnCustomer || ''}</td>
+      <td class="td-orig" style="font-family:monospace;font-size:11px">${r.item}</td>
+      <td class="td-orig td-num"><strong>${r.qty.toLocaleString()}</strong></td>
+      <td class="td-spec" style="text-align:center"><strong>${dash(g.specCode)}</strong></td>
+      <td class="td-calc"><span class="badge badge-neutral">${g.tech || '—'}</span></td>
+      <td class="td-calc">${g.separator || '—'}</td>
+      <td class="td-calc"><strong>${g.battType || '—'}</strong></td>
+      <td class="td-calc">${g.plate || '—'}</td>
+      <td class="td-calc" style="text-align:center">${g.line1 ? `<span class="badge badge-neutral">${g.line1}</span>` : '—'}</td>
+      <td class="td-calc" style="text-align:center">${g.line2 ? `<span class="badge badge-neutral">${g.line2}</span>` : '—'}</td>
+      <td class="td-pos" style="font-family:monospace;font-size:11px">${dash(g.itemDataInfor)}</td>
+      <td class="td-pos" style="font-family:monospace;font-size:11px">${dash(g.pnPos)}</td>
+      <td class="td-pos">${dash(g.gridPos)}</td>
+      <td class="td-pos td-num">${num(g.qpPos)}</td>
+      <td class="td-pos td-num">${num(g.qPulePos)}</td>
+      <td class="td-neg" style="font-family:monospace;font-size:11px">${dash(g.pnNeg)}</td>
+      <td class="td-neg">${dash(g.gridNeg)}</td>
+      <td class="td-neg td-num">${num(g.qpNeg)}</td>
+      <td class="td-neg td-num">${num(g.qPuleNeg)}</td>
+    </tr>`;
+  }).join('');
+}
+
+function getExportOrders() {
+  const state = BPMS.getState();
+  if (currentPeriod) {
+    return (state.orders?.[currentPeriod] || []).map(r => ({ ...r, _period: currentPeriod }));
+  }
+  const all = [];
+  BPMS.getPeriods().forEach(p => {
+    (state.orders?.[p] || []).forEach(r => all.push({ ...r, _period: p }));
+  });
+  return all;
+}
+
+function exportRaw() {
+  const orders = getExportOrders();
+  if (!orders.length) { BPMS.toast('Tidak ada data untuk diekspor', 'error'); return; }
+
+  const showPeriod = !currentPeriod;
+  const rows = orders.map((r, i) => {
+    const row = {};
+    if (showPeriod) row['Periode'] = BPMS.formatPeriod(r._period);
+    row['No']              = i + 1;
+    row['RFQ']             = r.rfq;
+    row['SO']              = r.so;
+    row['Sold To']         = r.soldTo;
+    row['Ship To']         = r.shipTo;
+    row['No PO']           = r.noPo;
+    row['PN Customer']     = r.pnCustomer;
+    row['PN Infor (ITEM)'] = r.item;
+    row['Qty']             = r.qty;
+    row['Type']            = r.type;
+    return row;
+  });
+
+  const suffix = currentPeriod ? `_${currentPeriod}` : '_Semua';
+  const ws = XLSX.utils.json_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Raw Orders');
+  XLSX.writeFile(wb, `FAH_RawOrder${suffix}.xlsx`);
+  BPMS.toast('Export Raw Data Order berhasil', 'success');
+}
+
+function exportGenerated() {
+  const orders = getExportOrders();
+  if (!orders.length) { BPMS.toast('Tidak ada data untuk diekspor', 'error'); return; }
+
+  orders.forEach(r => {
+    if (r._linesComputed) return;
+    const p = r._parsed || {};
+    const m = p.battType ? BPMS.findPCSMatches(p.battType, p.tech, p.plate, p.separator)[0] : null;
+    r._line1 = m?.line1 || '';
+    r._line2 = m?.line2 || '';
+    r._linesComputed = true;
+  });
+
+  const maps = buildLookupMaps();
+  const showPeriod = !currentPeriod;
+
+  const rows = orders.map((r, i) => {
+    const g   = computeGenRow(r, maps);
+    const row = {};
+    if (showPeriod) row['Periode'] = BPMS.formatPeriod(r._period);
+    row['No']                         = i + 1;
+    row['PN Customer']                = r.pnCustomer;
+    row['ITEM']                       = r.item;
+    row['Qty Produksi']               = r.qty;
+    row['Spec Code']                  = g.specCode;
+    row['Tech']                       = g.tech;
+    row['Separator']                  = g.separator;
+    row['Battery Type']               = g.battType;
+    row['Plate']                      = g.plate;
+    row['1st Line']                   = g.line1;
+    row['2nd Line']                   = g.line2;
+    row['Item Data Infor']            = g.itemDataInfor;
+    row['PN Plate Positif']           = g.pnPos;
+    row['Grid Process Plate Positif'] = g.gridPos;
+    row['Qty Plate Positif']          = g.qpPos;
+    row['Qty Pule Plate Positif']     = g.qPulePos;
+    row['PN Plate Negatif']           = g.pnNeg;
+    row['Grid Process Plate Negatif'] = g.gridNeg;
+    row['Qty Plate Negatif']          = g.qpNeg;
+    row['Qty Pule Plate Negatif']     = g.qPuleNeg;
+    return row;
+  });
+
+  const suffix = currentPeriod ? `_${currentPeriod}` : '_Semua';
+  const ws = XLSX.utils.json_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Generated Orders');
+  XLSX.writeFile(wb, `FAH_GeneratedOrder${suffix}.xlsx`);
+  BPMS.toast('Export Generated Data berhasil', 'success');
+}
+</script>
+</body>
+</html>

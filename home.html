@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Home — Factory Analytics Hub</title>
+  <link rel="stylesheet" href="style.css"/>
+  <style>
+    .home-wrap {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      background: #f0f2f5;
+    }
+    .home-hero {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 56px;
+      padding: 48px;
+      background: #fff;
+      width: 100%;
+      height: 100%;
+    }
+    .home-logo-img {
+      width: 280px;
+      height: auto;
+      flex-shrink: 0;
+    }
+    .home-brand {
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+    }
+    .home-brand-title {
+      font-size: 42px;
+      font-weight: 800;
+      line-height: 1.1;
+      color: #0f2044;
+      letter-spacing: -0.5px;
+      text-transform: uppercase;
+    }
+    .home-brand-title span {
+      color: #2563eb;
+    }
+    .home-brand-title em {
+      color: #16a34a;
+      font-style: normal;
+    }
+    .home-divider {
+      width: 56px;
+      height: 3px;
+      background: linear-gradient(90deg, #2563eb, #16a34a);
+      border-radius: 2px;
+      margin: 16px 0;
+    }
+    .home-slogan {
+      font-size: 17px;
+      color: #374151;
+      font-style: italic;
+      line-height: 1.55;
+      margin: 0;
+    }
+    .home-nav-cards {
+      display: flex;
+      gap: 12px;
+      margin-top: 28px;
+      flex-wrap: wrap;
+    }
+    .home-nav-card {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 16px;
+      background: #f0f2f5;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      text-decoration: none;
+      color: #374151;
+      font-size: 13px;
+      font-weight: 500;
+      transition: background 0.15s, box-shadow 0.15s;
+    }
+    .home-nav-card:hover {
+      background: #e8eaf6;
+      box-shadow: 0 2px 8px rgba(94,106,210,0.12);
+      color: #3730a3;
+    }
+    .home-nav-card svg { flex-shrink: 0; }
+    @media (max-width: 640px) {
+      .home-hero { flex-direction: column; gap: 32px; padding: 32px 24px; }
+      .home-logo-img { width: 200px; }
+      .home-brand-title { font-size: 30px; }
+    }
+  </style>
+</head>
+<body>
+<div class="app-layout">
+  <div id="sidebarMount"></div>
+
+  <div class="main-content" style="padding:0">
+    <div class="home-wrap">
+      <div class="home-hero">
+        <img src="Logo FAH.png" class="home-logo-img" alt="Factory Analytics Hub Logo">
+        <div class="home-brand">
+          <div class="home-brand-title">
+            FACTORY<br>
+            <span>ANALYTICS</span><br>
+            <em>HUB</em>
+          </div>
+          <div class="home-divider"></div>
+          <p class="home-slogan">Turning Production Data<br>into Actionable Decisions</p>
+          <div class="home-nav-cards">
+            <a href="dashboard.html" class="home-nav-card">
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><rect x="1" y="1" width="6" height="7" rx="1"/><rect x="9" y="1" width="6" height="4" rx="1"/><rect x="1" y="10" width="6" height="5" rx="1"/><rect x="9" y="7" width="6" height="8" rx="1"/></svg>
+              Dashboard
+            </a>
+            <a href="lvc-analysis.html" class="home-nav-card">
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M1 12l4-5 3 3 4-6 3 4"/></svg>
+              LVC Analysis
+            </a>
+            <a href="data-order.html" class="home-nav-card">
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><rect x="1" y="1" width="14" height="3" rx="1"/><rect x="1" y="6" width="14" height="3" rx="1"/><rect x="1" y="11" width="10" height="3" rx="1"/></svg>
+              Data Order
+            </a>
+            <a href="database-pcs.html" class="home-nav-card">
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><ellipse cx="8" cy="4" rx="6" ry="2.5"/><path d="M2 4v4c0 1.4 2.7 2.5 6 2.5S14 9.4 14 8V4"/><path d="M2 8v4c0 1.4 2.7 2.5 6 2.5S14 13.4 14 12V8"/></svg>
+              Database PCS
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="shared-components.js"></script>
+</body>
+</html>

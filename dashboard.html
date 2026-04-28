@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Dashboard — Factory Analytics Hub</title>
+  <link rel="stylesheet" href="style.css"/>
+</head>
+<body>
+<div class="app-layout">
+  <div id="sidebarMount"></div>
+
+  <div class="main-content">
+    <div id="topbarMount"></div>
+
+    <div class="page-body">
+      <!-- Period selector -->
+      <div class="period-bar mb-6">
+        <span class="period-label">Periode:</span>
+        <select id="periodSelect" class="form-control" style="width:auto">
+          <option value="">— Pilih Periode —</option>
+        </select>
+        <a href="setting-capacity.html" class="btn btn-ghost btn-sm">+ Periode Baru</a>
+      </div>
+
+      <!-- Stats -->
+      <div class="stats-grid" id="statsGrid">
+        <div class="stat-card">
+          <div class="stat-label">Total Order</div>
+          <div class="stat-value" id="statOrders">—</div>
+          <div class="stat-sub">Items dalam periode</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Total Qty</div>
+          <div class="stat-value" id="statQty">—</div>
+          <div class="stat-sub">Unit produksi</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Hari Kerja</div>
+          <div class="stat-value" id="statDays">—</div>
+          <div class="stat-sub">Hari ON dalam periode</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Line Aktif</div>
+          <div class="stat-value" id="statLines">—</div>
+          <div class="stat-sub">Line dengan loading > 0%</div>
+        </div>
+      </div>
+
+      <!-- LVC Overview Chart -->
+      <div class="card mb-6">
+        <div class="card-header">
+          <span class="card-title">Loading vs Capacity — Overview</span>
+          <a href="lvc-analysis.html" class="btn btn-ghost btn-sm">Detail Analisis →</a>
+        </div>
+        <div id="dashChart" class="chart-wrap">
+          <div class="empty-state">
+            <div class="empty-icon">📊</div>
+            <div class="empty-title">Pilih periode untuk melihat chart</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- LVC Summary Table -->
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Ringkasan per LINE</span>
+        </div>
+        <div class="table-wrap">
+          <div class="table-scroll">
+            <table id="summaryTable">
+              <thead>
+                <tr>
+                  <th>LINE</th>
+                  <th>Total Qty</th>
+                  <th>Processing (Jam)</th>
+                  <th>Kapasitas (Jam)</th>
+                  <th>Loading %</th>
+                  <th>Status</th>
+                  <th>Shift Aktif</th>
+                </tr>
+              </thead>
+              <tbody id="summaryBody">
+                <tr><td colspan="7" class="text-center text-muted" style="padding:32px">Pilih periode untuk melihat data</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="shared-components.js"></script>
+<script>
+function pageInit() {
+  document.getElementById('topbarMount').innerHTML = BPMS.renderTopbar('Dashboard');
+
+  const sel = document.getElementById('periodSelect');
+  const periods = BPMS.getPeriods();
+  periods.forEach(p => {
+    const opt = document.createElement('option');
+    opt.value = p;
+    opt.textContent = BPMS.formatPeriod(p) + ' (' + p + ')';
+    sel.appendChild(opt);
+  });
+
+  const current = BPMS.getCurrentPeriod();
+  if (periods.includes(current)) sel.value = current;
+
+  sel.addEventListener('change', () => renderDashboard(sel.value));
+  if (sel.value) renderDashboard(sel.value);
+}
+
+function renderDashboard(period) {
+  if (!period) return;
+  const state   = BPMS.getState();
+  const orders  = state.orders?.[period] || [];
+  const days    = BPMS.getWorkDayCount(period);
+
+  const totalQty = orders.reduce((s, o) => s + (Number(o.qty) || 0), 0);
+  document.getElementById('statOrders').textContent = orders.length.toLocaleString();
+  document.getElementById('statQty').textContent    = totalQty.toLocaleString();
+  document.getElementById('statDays').textContent   = days;
+
+  const { results } = BPMS.calcLVC(period);
+  const activeLines = results.filter(r => r.processingHours > 0).length;
+  document.getElementById('statLines').textContent = activeLines + ' / 7';
+
+  renderSummaryTable(results, state, period);
+  renderDashChart(results);
+}
+
+function renderSummaryTable(results, state, period) {
+  const body = document.getElementById('summaryBody');
+  if (!results.length) {
+    body.innerHTML = '<tr><td colspan="7" class="text-center text-muted" style="padding:32px">Tidak ada data</td></tr>';
+    return;
+  }
+
+  body.innerHTML = results.map(r => {
+    const cap = state.capacity?.[period]?.[r.line] || { s1: true, s2: true, s3: false };
+    const shifts = [cap.s1 && 'S1', cap.s2 && 'S2', cap.s3 && 'S3'].filter(Boolean).join('+') || '—';
+    const badgeCls = r.status === 'OVERLOADED' ? 'badge-danger' : r.status === 'WARNING' ? 'badge-warning' : 'badge-ok';
+    const rowCls   = r.status === 'OVERLOADED' ? 'row-highlight-danger' : r.status === 'WARNING' ? 'row-highlight-warning' : '';
+    return `<tr class="${rowCls}">
+      <td><strong>${r.line}</strong></td>
+      <td>${BPMS.fmtInt(r.qty)}</td>
+      <td>${BPMS.fmtNum(r.processingHours, 2)}</td>
+      <td>${BPMS.fmtNum(r.capacityHours, 2)}</td>
+      <td><strong>${r.processingHours > 0 ? BPMS.fmtNum(r.loading, 1) + '%' : '—'}</strong></td>
+      <td><span class="badge ${badgeCls}">${r.processingHours > 0 ? r.status : 'IDLE'}</span></td>
+      <td>${shifts}</td>
+    </tr>`;
+  }).join('');
+}
+
+function renderDashChart(results) {
+  const container = document.getElementById('dashChart');
+  const active    = results.filter(r => r.processingHours > 0 || r.capacityHours > 0);
+  if (!active.length) {
+    container.innerHTML = '<div class="empty-state"><div class="empty-icon">📊</div><div class="empty-title">Tidak ada data loading untuk periode ini</div><div class="empty-text">Upload data order terlebih dahulu</div></div>';
+    return;
+  }
+
+  const W = 720, H = 240;
+  const mL = 50, mR = 20, mT = 30, mB = 50;
+  const chartW = W - mL - mR;
+  const chartH = H - mT - mB;
+  const barW   = Math.min(40, chartW / active.length - 12);
+  const barGap = chartW / active.length;
+
+  const maxLoad = Math.max(120, ...active.map(r => r.loading));
+  const scaleY  = v => chartH - (v / maxLoad) * chartH;
+
+  let lines = '';
+  [100, 85].forEach(pct => {
+    const y   = scaleY(pct) + mT;
+    const col = pct === 100 ? '#dc2626' : '#c05a00';
+    lines += `<line x1="${mL}" y1="${y}" x2="${W - mR}" y2="${y}" stroke="${col}" stroke-width="1" stroke-dasharray="5,3" opacity="0.6"/>
+      <text x="${mL - 4}" y="${y + 4}" text-anchor="end" font-size="10" fill="${col}">${pct}%</text>`;
+  });
+
+  let ticks = '';
+  [0, 25, 50, 75, 100, 125].forEach(v => {
+    if (v > maxLoad) return;
+    const y = scaleY(v) + mT;
+    ticks += `<line x1="${mL}" y1="${y}" x2="${W - mR}" y2="${y}" stroke="rgba(0,0,0,0.06)" stroke-width="1"/>
+      <text x="${mL - 4}" y="${y + 4}" text-anchor="end" font-size="10" fill="#9b9fa8">${v}%</text>`;
+  });
+
+  let bars = '';
+  active.forEach((r, i) => {
+    const cx  = mL + barGap * i + barGap / 2;
+    const x   = cx - barW / 2;
+    const pct = Math.min(r.loading, maxLoad);
+    const bh  = (pct / maxLoad) * chartH;
+    const y   = mT + chartH - bh;
+    const col   = r.loading > 100 ? '#dc2626' : r.loading > 85 ? '#c05a00' : '#16a34a';
+    const bgCol = r.loading > 100 ? 'rgba(220,38,38,0.07)' : r.loading > 85 ? 'rgba(192,90,0,0.07)' : 'rgba(22,163,74,0.07)';
+
+    bars += `
+      <rect x="${x}" y="${mT}" width="${barW}" height="${chartH}" fill="${bgCol}" rx="3"/>
+      <rect x="${x}" y="${y}" width="${barW}" height="${bh}" fill="${col}" opacity="0.9" rx="3"/>
+      <text x="${cx}" y="${y - 5}" text-anchor="middle" font-size="10" fill="${col}" font-weight="600">${r.loading > 0 ? r.loading.toFixed(1)+'%' : ''}</text>
+      <text x="${cx}" y="${mT + chartH + 15}" text-anchor="middle" font-size="11" fill="#6c717d">${r.line.replace('Line ','L')}</text>`;
+  });
+
+  container.innerHTML = `
+    <svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="max-width:100%;overflow:visible">
+      <line x1="${mL}" y1="${mT}" x2="${mL}" y2="${mT + chartH}" stroke="rgba(0,0,0,0.15)" stroke-width="1"/>
+      <line x1="${mL}" y1="${mT + chartH}" x2="${W - mR}" y2="${mT + chartH}" stroke="rgba(0,0,0,0.15)" stroke-width="1"/>
+      ${ticks}${lines}${bars}
+    </svg>`;
+}
+</script>
+</body>
+</html>
