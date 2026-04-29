@@ -130,6 +130,106 @@
     #genTable td.td-neg  { background: #fff5f5; }
     #genTable td.td-num  { text-align: right; font-variant-numeric: tabular-nums; }
 
+    /* ── Resume Order Table ─────────────────────────────────────── */
+    .resume-table-wrap {
+      overflow: hidden;
+      height: calc(100vh - 270px);
+    }
+    .resume-table-wrap .table-scroll { height: 100%; overflow: auto; }
+    #resumeTable {
+      font-size: 12px;
+      table-layout: auto;
+      width: max-content;
+      min-width: 100%;
+      border-collapse: collapse;
+    }
+    #resumeTable th, #resumeTable td {
+      padding: 6px 12px;
+      white-space: nowrap;
+      border: 1px solid #cbd5e1;
+    }
+    #resumeTable thead th {
+      background: var(--accent);
+      color: #fff;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      position: sticky;
+      top: 0;
+      z-index: 3;
+      border-color: rgba(255,255,255,0.2);
+      user-select: none;
+    }
+    #resumeTable thead th.rt-num { text-align: right; }
+    #resumeTable thead th.rt-center { text-align: center; }
+    #resumeTable tbody td { vertical-align: middle; }
+    #resumeTable td.rt-num {
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+    }
+    #resumeTable td.rt-center { text-align: center; }
+    #resumeTable td.rt-no, #resumeTable td.rt-group {
+      font-weight: 600;
+      color: var(--text-1);
+      background: var(--bg-2);
+    }
+    /* Subtotal rows */
+    #resumeTable tr.rt-subtotal td {
+      background: #fef3e2;
+      font-weight: 700;
+      font-size: 11px;
+      color: #7c4a00;
+      border-top: 2px solid #f0c070;
+      border-bottom: 2px solid #f0c070;
+    }
+    /* % dot indicator */
+    .rt-pct-wrap {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 6px;
+    }
+    .rt-dot {
+      flex-shrink: 0;
+      width: 11px;
+      height: 11px;
+      border-radius: 50%;
+    }
+    .rt-dot.green { background: #16a34a; }
+    .rt-dot.red   { background: #dc2626; }
+    /* MB editable input */
+    .rt-mb-input {
+      width: 100%;
+      min-width: 72px;
+      border: 1px solid transparent;
+      background: transparent;
+      text-align: right;
+      font-size: 12px;
+      font-variant-numeric: tabular-nums;
+      color: var(--text-1);
+      outline: none;
+      padding: 2px 4px;
+      border-radius: 4px;
+      font-family: inherit;
+      transition: border-color .15s, background .15s;
+    }
+    .rt-mb-input:hover { border-color: var(--border-solid2); background: var(--bg-2); }
+    .rt-mb-input:focus { border-color: var(--accent); background: #f0f4ff; }
+    /* Hide number spin arrows */
+    .rt-mb-input::-webkit-outer-spin-button,
+    .rt-mb-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+    .rt-mb-input[type=number] { -moz-appearance: textfield; }
+
+    /* Filter icon on resume header */
+    .rt-filter {
+      cursor: pointer;
+      opacity: .6;
+      font-size: 9px;
+      margin-left: 3px;
+      transition: opacity .15s;
+    }
+    #resumeTable thead th:hover .rt-filter { opacity: 1; }
+
     /* Filter icon on header */
     .th-filter-order { cursor: pointer; display: inline-flex; align-items: center; gap: 3px; }
     .filter-icon-order { font-size: 9px; opacity: .5; transition: opacity .15s; }
@@ -186,7 +286,7 @@
                   <th class="th-orig">No</th><th class="th-orig">RFQ</th><th class="th-orig">SO</th>
                   <th class="th-orig">Sold To</th><th class="th-orig">Ship To</th>
                   <th class="th-orig">No PO</th><th class="th-orig">PN Customer</th>
-                  <th class="th-orig">ITEM</th><th class="th-orig">Qty</th><th class="th-orig">Type</th>
+                  <th class="th-orig">ITEM</th><th class="th-orig">Qty</th><th class="th-orig">Dry DUC Wet</th>
                   <th class="th-calc">Tech</th><th class="th-calc">Separator</th>
                   <th class="th-calc">Battery Type</th><th class="th-calc">Plate</th>
                   <th class="th-calc">1st Line</th><th class="th-calc">2nd Line</th>
@@ -221,12 +321,58 @@
 
       <!-- Tab Navigation -->
       <nav class="do-tabs" id="doTabs">
-        <button class="do-tab active" data-tab="data-order">Data Order</button>
+        <button class="do-tab active" data-tab="resume-order">Resume Order</button>
+        <button class="do-tab"        data-tab="data-order">Data Order</button>
         <button class="do-tab"        data-tab="generated">Generated Data Order</button>
       </nav>
 
+      <!-- ══ Panel: Resume Order ═══════════════════════════════════ -->
+      <div id="panel-resume-order" class="do-panel active">
+
+        <!-- Resume toolbar -->
+        <div class="flex items-center gap-3 mb-3">
+          <span id="resumeCount" class="text-muted text-sm">0 group</span>
+          <div class="ml-auto flex gap-2">
+            <button class="btn btn-ghost btn-sm" id="exportResumeBtn">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              Export Resume
+            </button>
+          </div>
+        </div>
+
+        <!-- Resume table -->
+        <div class="table-wrap resume-table-wrap">
+          <div class="table-scroll">
+            <table id="resumeTable">
+              <thead>
+                <tr>
+                  <th class="rt-center">No</th>
+                  <th>Group</th>
+                  <th>Customer</th>
+                  <th class="rt-num">D <span class="rt-filter">▾</span></th>
+                  <th class="rt-num">U <span class="rt-filter">▾</span></th>
+                  <th class="rt-num">W <span class="rt-filter">▾</span></th>
+                  <th class="rt-num">Lithium <span class="rt-filter">▾</span></th>
+                  <th class="rt-num">Total Qty <span class="rt-filter">▾</span></th>
+                  <th class="rt-num">MB</th>
+                  <th class="rt-num">%</th>
+                </tr>
+              </thead>
+              <tbody id="resumeBody">
+                <tr><td colspan="10"><div class="empty-state" style="padding:40px 0">
+                  <div class="empty-icon">📑</div>
+                  <div class="empty-title">Belum ada data</div>
+                  <div class="empty-text">Pilih periode untuk melihat Resume Order</div>
+                </div></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div><!-- end panel-resume-order -->
+
       <!-- ══ Panel: Data Order ══════════════════════════════════════ -->
-      <div id="panel-data-order" class="do-panel active">
+      <div id="panel-data-order" class="do-panel">
 
       <!-- Orders Table toolbar -->
       <div class="flex items-center gap-3 mb-3 flex-wrap">
@@ -255,7 +401,7 @@
             <thead id="ordersHead">
               <tr>
                 <th>No</th><th>RFQ</th><th>SO</th><th>Sold To</th><th>Ship To</th>
-                <th>No PO</th><th>PN Customer</th><th>ITEM</th><th>Qty</th><th>Type</th>
+                <th>No PO</th><th>PN Customer</th><th>ITEM</th><th>Qty</th><th>Dry DUC Wet</th>
                 <th>Tech</th><th>Separator</th><th>Battery Type</th><th>Plate</th>
                 <th>Aksi</th>
               </tr>
@@ -417,7 +563,8 @@ function pageInit() {
     document.querySelectorAll('.do-panel').forEach(p => p.classList.remove('active'));
     btn.classList.add('active');
     document.getElementById('panel-' + btn.dataset.tab).classList.add('active');
-    if (btn.dataset.tab === 'generated') renderGenerated();
+    if (btn.dataset.tab === 'generated')    renderGenerated();
+    if (btn.dataset.tab === 'resume-order') renderResume();
   });
 
   populatePeriods();
@@ -425,15 +572,17 @@ function pageInit() {
   const sel = document.getElementById('periodSelect');
   sel.addEventListener('change', () => {
     currentPeriod = sel.value;
-    renderOrders();
     const activeTab = document.querySelector('.do-tab.active')?.dataset.tab;
-    if (activeTab === 'generated') renderGenerated();
+    if (activeTab === 'data-order')    renderOrders();
+    if (activeTab === 'generated')     renderGenerated();
+    if (activeTab === 'resume-order')  renderResume();
   });
 
   const current = BPMS.getCurrentPeriod();
   if (BPMS.getPeriods().includes(current)) {
-    sel.value = current; currentPeriod = current; renderOrders();
+    sel.value = current; currentPeriod = current;
   }
+  renderResume();
 
   // Upload modal
   document.getElementById('uploadOrderBtn').addEventListener('click', openUploadModal);
@@ -481,6 +630,7 @@ function pageInit() {
   document.getElementById('exportGenBtn').addEventListener('click', exportGenerated);
   document.getElementById('genSearch').addEventListener('input', renderGenerated);
   document.getElementById('deleteOrdersBtn').addEventListener('click', deletePeriod);
+  document.getElementById('exportResumeBtn').addEventListener('click', exportResume);
   document.getElementById('searchInput').addEventListener('input', renderOrders);
 
   // Column filter wiring
@@ -588,7 +738,7 @@ const HEADER_MAP = {
   pnCustomer: ['PN Customer','PN CUSTOMER','PN_Customer'],
   item:       ['PN Infor (ITEM)','PN Infor','ITEM','Item','PN_INFOR','PN INFOR (ITEM)'],
   qty:        ['Qty','QTY','qty','Quantity'],
-  type:       ['Type','TYPE','type'],
+  type:       ['Dry DUC Wet','Type','TYPE','type'],
 };
 
 function findCol(obj, aliases) {
@@ -606,11 +756,13 @@ function handleFile(file) {
   const reader = new FileReader();
   reader.onload = e => {
     try {
-      const wb   = XLSX.read(e.target.result, { type: 'binary' });
-      const ws   = wb.Sheets[wb.SheetNames[0]];
-      const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
+      const wb      = XLSX.read(e.target.result, { type: 'binary' });
+      const ws      = wb.Sheets[wb.SheetNames[0]];
+      const rows    = XLSX.utils.sheet_to_json(ws, { defval: '' });
+      // Positional rows (header excluded) for column-index fallback
+      const rawRows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' }).slice(1);
 
-      const parsed = rows.map(row => {
+      const parsed = rows.map((row, idx) => {
         const qty  = Number(findCol(row, HEADER_MAP.qty));
         const item = String(findCol(row, HEADER_MAP.item)).trim();
         if (qty <= 0 || !item) return null;
@@ -618,6 +770,8 @@ function handleFile(file) {
         if (soldTo.toLowerCase().includes('total')) return null;
 
         const p = BPMS.parseItemString(item) || {};
+        // Column J (index 9) as fallback when named lookup yields nothing
+        const typeVal = String(findCol(row, HEADER_MAP.type) || rawRows[idx]?.[9] || '');
         return {
           no:         findCol(row, HEADER_MAP.no),
           rfq:        String(findCol(row, HEADER_MAP.rfq)),
@@ -628,7 +782,7 @@ function handleFile(file) {
           pnCustomer: String(findCol(row, HEADER_MAP.pnCustomer)),
           item,
           qty,
-          type:       String(findCol(row, HEADER_MAP.type)),
+          type:       typeVal,
           _parsed:    p,
         };
       }).filter(Boolean);
@@ -864,7 +1018,7 @@ function renderOrders() {
       <th ${o}>PN Customer</th>
       <th ${o}>ITEM ${fi('item')}</th>
       <th ${o}>Qty</th>
-      <th ${o}>Type ${fi('type')}</th>
+      <th ${o}>Dry DUC Wet ${fi('type')}</th>
       <th ${c}>Tech ${fi('tech')}</th>
       <th ${c}>Separator ${fi('separator')}</th>
       <th ${c}>Battery Type ${fi('battType')}</th>
@@ -1126,7 +1280,7 @@ function exportRaw() {
     row['PN Customer']     = r.pnCustomer;
     row['PN Infor (ITEM)'] = r.item;
     row['Qty']             = r.qty;
-    row['Type']            = r.type;
+    row['Dry DUC Wet']     = r.type;
     return row;
   });
 
@@ -1136,6 +1290,217 @@ function exportRaw() {
   XLSX.utils.book_append_sheet(wb, ws, 'Raw Orders');
   XLSX.writeFile(wb, `FAH_RawOrder${suffix}.xlsx`);
   BPMS.toast('Export Raw Data Order berhasil', 'success');
+}
+
+// ── Resume Order ─────────────────────────────────────────────────
+
+function renderResume() {
+  const body = document.getElementById('resumeBody');
+  const fmt  = v => (v && v !== 0)
+    ? Number(v).toLocaleString('id-ID')
+    : '<span class="text-muted" style="font-weight:400">-</span>';
+  const dot  = (totalQty, mb) => {
+    if (!mb) return '<span class="text-muted">-</span>';
+    const pct = Math.round(totalQty / mb * 100);
+    const cls = pct >= 100 ? 'green' : 'red';
+    return `<div class="rt-pct-wrap"><span>${pct}%</span><span class="rt-dot ${cls}"></span></div>`;
+  };
+
+  // resumeGroups: array of { no, group, customers:[{name,d,u,w,lithium}], totalQty, mb }
+  // Sumber data akan didefinisikan — saat ini tampilkan empty state
+  const resumeGroups = buildResumeGroups();
+
+  if (!resumeGroups.length) {
+    document.getElementById('resumeCount').textContent = '0 group';
+    body.innerHTML = `<tr><td colspan="10"><div class="empty-state" style="padding:40px 0">
+      <div class="empty-icon">📑</div>
+      <div class="empty-title">Belum ada data</div>
+      <div class="empty-text">Pilih periode untuk melihat Resume Order</div>
+    </div></td></tr>`;
+    return;
+  }
+
+  document.getElementById('resumeCount').textContent = `${resumeGroups.length} group`;
+
+  // Group category totals for subtotal rows
+  // resumeGroups tiap entry punya `subtotalAfter: true` jika ada baris total setelahnya
+  let html = '';
+  resumeGroups.forEach(g => {
+    const rowspan = g.customers.length;
+    g.customers.forEach((c, ci) => {
+      html += `<tr>`;
+      if (ci === 0) {
+        html += `<td class="rt-no rt-center" rowspan="${rowspan}">${g.no}</td>`;
+        html += `<td class="rt-group" rowspan="${rowspan}">${g.group}</td>`;
+      }
+      html += `<td>${c.name}</td>`;
+      html += `<td class="rt-num">${fmt(c.d)}</td>`;
+      html += `<td class="rt-num">${fmt(c.u)}</td>`;
+      html += `<td class="rt-num">${fmt(c.w)}</td>`;
+      html += `<td class="rt-num">${fmt(c.lithium)}</td>`;
+      if (ci === 0) {
+        html += `<td class="rt-num" rowspan="${rowspan}"><strong>${fmt(g.totalQty)}</strong></td>`;
+        html += `<td class="rt-num" rowspan="${rowspan}" style="padding:3px 8px">
+          <input type="number" class="rt-mb-input"
+            value="${g.mb || ''}"
+            placeholder="—"
+            data-key="${g.group.replace(/"/g,'&quot;')}"
+            oninput="onResumeMBChange(this)"/>
+        </td>`;
+        html += `<td class="rt-num rt-pct-cell" rowspan="${rowspan}"
+          data-key="${g.group.replace(/"/g,'&quot;')}"
+          data-total="${g.totalQty}">${dot(g.totalQty, g.mb)}</td>`;
+      }
+      html += `</tr>`;
+    });
+
+    if (g.subtotalAfter) {
+      const st = g.subtotalAfter;
+      html += `<tr class="rt-subtotal">
+        <td colspan="3" style="text-align:center"><strong>${st.label}</strong></td>
+        <td class="rt-num"><strong>${fmt(st.d)}</strong></td>
+        <td class="rt-num"><strong>${fmt(st.u)}</strong></td>
+        <td class="rt-num"><strong>${fmt(st.w)}</strong></td>
+        <td class="rt-num"><strong>${fmt(st.lithium)}</strong></td>
+        <td class="rt-num"><strong>${fmt(st.totalQty)}</strong></td>
+        <td class="rt-num"><strong>${fmt(st.mb)}</strong></td>
+        <td class="rt-num">${dot(st.totalQty, st.mb)}</td>
+      </tr>`;
+    }
+  });
+
+  body.innerHTML = html;
+}
+
+function onResumeMBChange(input) {
+  const key = input.dataset.key;
+  const val = Number(input.value) || 0;
+
+  // Simpan ke state
+  const state = BPMS.getState();
+  if (!state.resumeMB) state.resumeMB = {};
+  state.resumeMB[key] = val;
+  BPMS.saveState();
+
+  // Update % cell tanpa re-render seluruh tabel
+  const pctCell = document.querySelector(`.rt-pct-cell[data-key="${key}"]`);
+  if (pctCell) {
+    const totalQty = Number(pctCell.dataset.total) || 0;
+    const dot  = (totalQty, mb) => {
+      if (!mb) return '<span class="text-muted">-</span>';
+      const pct = Math.round(totalQty / mb * 100);
+      const cls = pct >= 100 ? 'green' : 'red';
+      return `<div class="rt-pct-wrap"><span>${pct}%</span><span class="rt-dot ${cls}"></span></div>`;
+    };
+    pctCell.innerHTML = dot(totalQty, val);
+  }
+}
+
+// Definisi group & kategori untuk Resume Order
+const RESUME_GROUP_DEF = [
+  { no: 1, label: 'AOP International', category: 'amb',
+    match: s => /aop international/i.test(s) || /int'l ex mar/i.test(s) },
+  { no: 2, label: 'AOP Domestic', category: 'amb',
+    match: s => (/aop domestic/i.test(s) || /add order.*domestic/i.test(s) || /add order.*aspira ln/i.test(s)) && !/mcb/i.test(s) },
+  { no: 3, label: 'Bina Pertiwi', category: 'amb',
+    match: s => /bina pertiwi/i.test(s) && s.trim().toLowerCase() !== 'bina pertiwi' },
+  { no: 4, label: 'ADM', category: 'amb',
+    match: s => /^adm\b/i.test(s) },
+  { no: 5, label: 'Others', category: 'amb',
+    match: s => /^(isuzu|hyundai)$/i.test(s) },
+  { no: 6, label: 'MCB Domestic', category: 'mcb',
+    match: s => /mcb/i.test(s) },
+  { no: 7, label: 'e-Bike', category: 'ebike',
+    match: s => /roda pacific mandiri|juara bike|tangkas|motor anak bangsa/i.test(s) },
+  { no: 8, label: 'Lithium', category: 'lithium',
+    match: s => /^(awi|akebono|ippi|bina pertiwi|etex building|inti pantja press industri|fscm|fni|nichirin indonesia|kharisma esa unggul|utpe|traktor nusantara)$/i.test(s) },
+];
+
+// Baris subtotal yang muncul setelah group tertentu
+const RESUME_SUBTOTALS = [
+  { afterNo: 5, label: 'Total AMB',    category: 'amb' },
+  { afterNo: 6, label: 'Total MCB',    category: 'mcb' },
+  { afterNo: 7, label: 'Total e-Bike', category: 'ebike' },
+  { afterNo: 8, label: 'Total Lithium',category: 'lithium' },
+];
+
+function buildResumeGroups() {
+  const state    = BPMS.getState();
+  const resumeMB = state.resumeMB || {};
+
+  // Kumpulkan order sesuai periode terpilih
+  let allOrders = [];
+  if (!currentPeriod) {
+    BPMS.getPeriods().forEach(p => {
+      (state.orders?.[p] || []).forEach(r => allOrders.push(r));
+    });
+  } else {
+    allOrders = state.orders?.[currentPeriod] || [];
+  }
+  if (!allOrders.length) return [];
+
+  // SUMIF per Sold To berdasarkan kolom Dry DUC Wet (D / U / W / P→Lithium)
+  const custMap = new Map();
+  allOrders.forEach(r => {
+    const soldTo = String(r.soldTo || '').trim();
+    if (!soldTo) return;
+    const qty  = Number(r.qty)  || 0;
+    const type = String(r.type || '').trim().toUpperCase();
+    if (!custMap.has(soldTo)) custMap.set(soldTo, { d: 0, u: 0, w: 0, lithium: 0 });
+    const c = custMap.get(soldTo);
+    if      (type === 'D') c.d       += qty;
+    else if (type === 'U') c.u       += qty;
+    else if (type === 'W') c.w       += qty;
+    else if (type === 'P') c.lithium += qty;
+  });
+
+  // Assign tiap Sold To ke group berdasarkan RESUME_GROUP_DEF (urutan = prioritas)
+  const groupMap = new Map();
+  custMap.forEach((vals, soldTo) => {
+    const def = RESUME_GROUP_DEF.find(d => d.match(soldTo))
+             || { no: 99, label: 'Uncategorized', category: 'other' };
+    if (!groupMap.has(def.label)) {
+      groupMap.set(def.label, { no: def.no, group: def.label, category: def.category, customers: [] });
+    }
+    groupMap.get(def.label).customers.push({ name: soldTo, ...vals });
+  });
+
+  // Urutkan berdasarkan No, lalu tambahkan subtotalAfter
+  const sortedGroups = [...groupMap.values()].sort((a, b) => a.no - b.no);
+
+  return sortedGroups.map(g => {
+    const totalQty = g.customers.reduce((s, c) => s + c.d + c.u + c.w + c.lithium, 0);
+    const entry = { no: g.no, group: g.group, customers: g.customers,
+                    totalQty, mb: resumeMB[g.group] || 0 };
+
+    const stDef = RESUME_SUBTOTALS.find(st => st.afterNo === g.no);
+    if (stDef) {
+      const catCusts = sortedGroups
+        .filter(x => x.category === stDef.category)
+        .flatMap(x => x.customers);
+      const stMB = sortedGroups
+        .filter(x => x.category === stDef.category)
+        .reduce((s, x) => s + (resumeMB[x.group] || 0), 0);
+      entry.subtotalAfter = {
+        label:    stDef.label,
+        d:        catCusts.reduce((s, c) => s + c.d, 0),
+        u:        catCusts.reduce((s, c) => s + c.u, 0),
+        w:        catCusts.reduce((s, c) => s + c.w, 0),
+        lithium:  catCusts.reduce((s, c) => s + c.lithium, 0),
+        totalQty: catCusts.reduce((s, c) => s + c.d + c.u + c.w + c.lithium, 0),
+        mb:       stMB,
+      };
+    }
+    return entry;
+  });
+}
+
+function exportResume() {
+  BPMS.toast('Export Resume belum dikonfigurasi', 'info');
+}
+
+function getActiveTab() {
+  return document.querySelector('.do-tab.active')?.dataset.tab;
 }
 
 function exportGenerated() {

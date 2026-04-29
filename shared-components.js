@@ -18,6 +18,7 @@ const BPMS = (() => {
     orders: {},
     capacity: {},
     workCalendar: {},
+    resumeMB: {},
     mpParams: {
       'Line 1': { std: 2, loader: 1, qc: 1 },
       'Line 2': { std: 2, loader: 1, qc: 1 },
