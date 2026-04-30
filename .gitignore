@@ -1,5 +1,24 @@
-# Object file
-*.o
+# ── State / Data ──────────────────────────────────────────────────
+api/state.json
+data/
 
-# Ada Library Information
-*.ali
+# ── OS files ───────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ── Editor / IDE ──────────────────────────────────────────────────
+.vscode/
+.idea/
+*.suo
+*.user
+
+# ── Node (jika ada tooling) ───────────────────────────────────────
+node_modules/
+npm-debug.log*
+
+# ── Temporary / build ─────────────────────────────────────────────
+*.tmp
+*.bak
+*.log
+dist/

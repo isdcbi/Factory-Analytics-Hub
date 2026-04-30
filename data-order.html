@@ -10,7 +10,7 @@
     /* ── Orders table: scrollable container dengan sticky header ── */
     .order-table-wrap {
       overflow: hidden;
-      height: calc(100vh - 324px); /* topbar 52 + padding 24 + actionbar 64 + stats 88 + infobar 50 + buffer 46 */
+      height: calc(100vh - 324px);
     }
     .order-table-wrap .table-scroll {
       height: 100%;
@@ -132,22 +132,31 @@
 
     /* ── Resume Order Table ─────────────────────────────────────── */
     .resume-table-wrap {
-      overflow: hidden;
-      height: calc(100vh - 270px);
+      overflow-x: auto;
     }
-    .resume-table-wrap .table-scroll { height: 100%; overflow: auto; }
+    .resume-table-wrap .table-scroll { overflow-x: auto; }
     #resumeTable {
       font-size: 12px;
-      table-layout: auto;
-      width: max-content;
-      min-width: 100%;
+      table-layout: fixed;
+      width: 100%;
+      min-width: 680px;
       border-collapse: collapse;
     }
     #resumeTable th, #resumeTable td {
       padding: 6px 12px;
-      white-space: nowrap;
       border: 1px solid #cbd5e1;
     }
+    #resumeTable th {
+      white-space: nowrap;       /* header tidak wrap, tapi juga tidak di-clip */
+    }
+    #resumeTable td {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    /* Lebar kolom diatur via colgroup — tidak terpengaruh rowspan */
+    #resumeTable td.rt-no     { text-align: center; }
+    #resumeTable td.rt-cust   { text-align: left; }
     #resumeTable thead th {
       background: var(--accent);
       color: #fff;
@@ -219,6 +228,18 @@
     .rt-mb-input::-webkit-outer-spin-button,
     .rt-mb-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
     .rt-mb-input[type=number] { -moz-appearance: textfield; }
+
+    /* Hanya card Unmapped yang clickable */
+    #cardUnmapped {
+      cursor: pointer;
+      transition: box-shadow .15s, border-color .15s, background .15s;
+    }
+    #cardUnmapped:hover, #cardPNNotFound:hover {
+      background: var(--bg-2);
+      border-color: var(--red);
+      box-shadow: 0 0 0 2px rgba(220,38,38,.12);
+    }
+    #cardPNNotFound { cursor: pointer; transition: box-shadow .15s, border-color .15s, background .15s; }
 
     /* Filter icon on resume header */
     .rt-filter {
@@ -300,22 +321,27 @@
 
       <!-- Summary Stats -->
       <div class="stats-grid mb-4" id="orderStats">
-        <div class="stat-card">
+        <div class="stat-card" id="cardTotalItem">
           <div class="stat-label">Total Item</div>
           <div class="stat-value" id="statTotalItem">—</div>
         </div>
-        <div class="stat-card">
+        <div class="stat-card" id="cardTotalQty">
           <div class="stat-label">Total Qty Order</div>
           <div class="stat-value" id="statTotalQty">—</div>
         </div>
-        <div class="stat-card">
+        <div class="stat-card" id="cardLineAktif">
           <div class="stat-label">Line Aktif</div>
           <div class="stat-value" id="statLineAktif">—</div>
         </div>
-        <div class="stat-card">
+        <div class="stat-card" id="cardUnmapped" onclick="openUnmappedModal()">
           <div class="stat-label">Unmapped</div>
           <div class="stat-value" id="statUnmapped" style="color:var(--red)">—</div>
           <div class="stat-sub" id="statUnmappedSub"></div>
+        </div>
+        <div class="stat-card" id="cardPNNotFound" onclick="openPNNotFoundModal()">
+          <div class="stat-label">PN NOT FOUND</div>
+          <div class="stat-value" id="statPNNotFound" style="color:var(--red)">—</div>
+          <div class="stat-sub">Belum ada PN Infor</div>
         </div>
       </div>
 
@@ -344,16 +370,28 @@
         <div class="table-wrap resume-table-wrap">
           <div class="table-scroll">
             <table id="resumeTable">
+              <colgroup>
+                <col style="width:56px">   <!-- No -->
+                <col style="width:130px">  <!-- Group -->
+                <col>                      <!-- Customer -->
+                <col style="width:92px">   <!-- D -->
+                <col style="width:92px">   <!-- U -->
+                <col style="width:92px">   <!-- W -->
+                <col style="width:92px">   <!-- Lithium -->
+                <col style="width:104px">  <!-- Total Qty -->
+                <col style="width:96px">   <!-- MB -->
+                <col style="width:72px">   <!-- % -->
+              </colgroup>
               <thead>
                 <tr>
                   <th class="rt-center">No</th>
                   <th>Group</th>
                   <th>Customer</th>
-                  <th class="rt-num">D <span class="rt-filter">▾</span></th>
-                  <th class="rt-num">U <span class="rt-filter">▾</span></th>
-                  <th class="rt-num">W <span class="rt-filter">▾</span></th>
-                  <th class="rt-num">Lithium <span class="rt-filter">▾</span></th>
-                  <th class="rt-num">Total Qty <span class="rt-filter">▾</span></th>
+                  <th class="rt-num">D</th>
+                  <th class="rt-num">U</th>
+                  <th class="rt-num">W</th>
+                  <th class="rt-num">Lithium</th>
+                  <th class="rt-num">Total Qty</th>
                   <th class="rt-num">MB</th>
                   <th class="rt-num">%</th>
                 </tr>
@@ -545,6 +583,66 @@
   </div>
 </div>
 
+<!-- PN Not Found Modal -->
+<div id="pnNotFoundModal" style="display:none;position:fixed;inset:0;z-index:100;background:rgba(0,0,0,0.35);align-items:flex-start;justify-content:center;padding-top:60px">
+  <div style="background:var(--bg-1);border:1px solid var(--border-solid2);border-radius:12px;width:700px;max-width:95vw;max-height:80vh;display:flex;flex-direction:column;box-shadow:0 8px 32px rgba(0,0,0,0.15)">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:18px 24px;border-bottom:1px solid var(--border-solid2);flex-shrink:0">
+      <div>
+        <div style="font-size:15px;font-weight:600;color:var(--text-1)">PN Not Found</div>
+        <div class="text-muted text-sm" id="pnNotFoundModalSub" style="margin-top:2px">—</div>
+      </div>
+      <button class="btn btn-ghost btn-xs" onclick="closePNNotFoundModal()">✕</button>
+    </div>
+    <div style="overflow:auto;flex:1">
+      <table style="width:100%;font-size:12px;border-collapse:collapse">
+        <thead>
+          <tr>
+            <th style="position:sticky;top:0;background:var(--bg-2);padding:7px 12px;text-align:left;font-size:11px;font-weight:600;border-bottom:1px solid var(--border-solid2);white-space:nowrap">No</th>
+            <th style="position:sticky;top:0;background:var(--bg-2);padding:7px 12px;text-align:left;font-size:11px;font-weight:600;border-bottom:1px solid var(--border-solid2);white-space:nowrap">PN Customer</th>
+            <th style="position:sticky;top:0;background:var(--bg-2);padding:7px 12px;text-align:left;font-size:11px;font-weight:600;border-bottom:1px solid var(--border-solid2);white-space:nowrap">ITEM</th>
+            <th style="position:sticky;top:0;background:var(--bg-2);padding:7px 12px;text-align:center;font-size:11px;font-weight:600;border-bottom:1px solid var(--border-solid2);white-space:nowrap">Digit</th>
+            <th style="position:sticky;top:0;background:var(--bg-2);padding:7px 12px;text-align:right;font-size:11px;font-weight:600;border-bottom:1px solid var(--border-solid2);white-space:nowrap">Qty</th>
+            <th style="position:sticky;top:0;background:var(--bg-2);padding:7px 12px;text-align:left;font-size:11px;font-weight:600;border-bottom:1px solid var(--border-solid2);white-space:nowrap">Sold To</th>
+            <th style="position:sticky;top:0;background:var(--bg-2);padding:7px 12px;text-align:left;font-size:11px;font-weight:600;border-bottom:1px solid var(--border-solid2);white-space:nowrap">Periode</th>
+          </tr>
+        </thead>
+        <tbody id="pnNotFoundBody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Unmapped Modal -->
+<div id="unmappedModal" style="display:none;position:fixed;inset:0;z-index:100;background:rgba(0,0,0,0.35);align-items:flex-start;justify-content:center;padding-top:60px">
+  <div style="background:var(--bg-1);border:1px solid var(--border-solid2);border-radius:12px;width:820px;max-width:95vw;max-height:80vh;display:flex;flex-direction:column;box-shadow:0 8px 32px rgba(0,0,0,0.15)">
+    <!-- Header -->
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:18px 24px;border-bottom:1px solid var(--border-solid2);flex-shrink:0">
+      <div>
+        <div style="font-size:15px;font-weight:600;color:var(--text-1)">Data Unmapped</div>
+        <div class="text-muted text-sm" id="unmappedModalSub" style="margin-top:2px">—</div>
+      </div>
+      <button class="btn btn-ghost btn-xs" onclick="closeUnmappedModal()">✕</button>
+    </div>
+    <!-- Table -->
+    <div style="overflow:auto;flex:1;padding:0">
+      <table style="width:100%;font-size:12px;border-collapse:collapse">
+        <thead>
+          <tr>
+            <th style="position:sticky;top:0;background:var(--bg-2);padding:7px 12px;text-align:left;font-size:11px;font-weight:600;border-bottom:1px solid var(--border-solid2);white-space:nowrap">No</th>
+            <th style="position:sticky;top:0;background:var(--bg-2);padding:7px 12px;text-align:left;font-size:11px;font-weight:600;border-bottom:1px solid var(--border-solid2);white-space:nowrap">PN Customer</th>
+            <th style="position:sticky;top:0;background:var(--bg-2);padding:7px 12px;text-align:left;font-size:11px;font-weight:600;border-bottom:1px solid var(--border-solid2);white-space:nowrap;font-family:monospace">ITEM</th>
+            <th style="position:sticky;top:0;background:var(--bg-2);padding:7px 12px;text-align:right;font-size:11px;font-weight:600;border-bottom:1px solid var(--border-solid2);white-space:nowrap">Qty</th>
+            <th style="position:sticky;top:0;background:var(--bg-2);padding:7px 12px;text-align:left;font-size:11px;font-weight:600;border-bottom:1px solid var(--border-solid2);white-space:nowrap">Battery Type</th>
+            <th style="position:sticky;top:0;background:var(--bg-2);padding:7px 12px;text-align:left;font-size:11px;font-weight:600;border-bottom:1px solid var(--border-solid2);white-space:nowrap">Sold To</th>
+            <th style="position:sticky;top:0;background:var(--bg-2);padding:7px 12px;text-align:left;font-size:11px;font-weight:600;border-bottom:1px solid var(--border-solid2);white-space:nowrap">Periode</th>
+          </tr>
+        </thead>
+        <tbody id="unmappedBody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
 <script src="shared-components.js"></script>
 <script>
 let currentPeriod    = '';
@@ -589,7 +687,9 @@ function pageInit() {
   document.getElementById('closeUploadModal').addEventListener('click', closeUploadModal);
   document.getElementById('cancelUploadModal').addEventListener('click', closeUploadModal);
   document.getElementById('uploadModal').addEventListener('click', e => { if (e.target === e.currentTarget) closeUploadModal(); });
-  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeUploadModal(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeUploadModal(); closeUnmappedModal(); closePNNotFoundModal(); } });
+  document.getElementById('unmappedModal').addEventListener('click', e => { if (e.target === e.currentTarget) closeUnmappedModal(); });
+  document.getElementById('pnNotFoundModal').addEventListener('click', e => { if (e.target === e.currentTarget) closePNNotFoundModal(); });
   document.getElementById('yearUp').addEventListener('click', () => {
     const el = document.getElementById('modalYear');
     el.value = Math.min(2099, (parseInt(el.value) || new Date().getFullYear()) + 1);
@@ -646,6 +746,104 @@ function pageInit() {
   });
   document.getElementById('orderFilterDropdown').addEventListener('click', e => e.stopPropagation());
   document.addEventListener('click', () => closeOrderFilter());
+}
+
+// ── PN Not Found Modal ────────────────────────────────────────────
+
+function openPNNotFoundModal() {
+  const state = BPMS.getState();
+  let allOrders = [];
+  if (!currentPeriod) {
+    BPMS.getPeriods().forEach(p => {
+      (state.orders?.[p] || []).forEach(r => allOrders.push({ ...r, _period: p }));
+    });
+  } else {
+    allOrders = (state.orders?.[currentPeriod] || []).map(r => ({ ...r, _period: currentPeriod }));
+  }
+
+  const invalid = allOrders.filter(r => (r.item || '').length < 27);
+
+  document.getElementById('pnNotFoundModalSub').textContent =
+    `${invalid.length} item dengan PN Infor tidak lengkap (< 27 digit)`;
+
+  const tbody = document.getElementById('pnNotFoundBody');
+  if (!invalid.length) {
+    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:32px;color:var(--text-4)">Semua PN Infor lengkap</td></tr>`;
+  } else {
+    tbody.innerHTML = invalid.map((r, i) => {
+      const digits = (r.item || '').length;
+      return `<tr style="border-bottom:1px solid var(--border-solid2)">
+        <td style="padding:6px 12px;color:var(--text-4)">${i + 1}</td>
+        <td style="padding:6px 12px">${r.pnCustomer || ''}</td>
+        <td style="padding:6px 12px;font-family:monospace;font-size:11px;color:var(--red)">${r.item || '—'}</td>
+        <td style="padding:6px 12px;text-align:center">
+          <span style="background:#fee2e2;color:#b91c1c;padding:2px 7px;border-radius:4px;font-size:11px;font-weight:600">${digits}</span>
+        </td>
+        <td style="padding:6px 12px;text-align:right;font-weight:600">${(r.qty || 0).toLocaleString()}</td>
+        <td style="padding:6px 12px">${r.soldTo || ''}</td>
+        <td style="padding:6px 12px"><span class="badge badge-neutral">${BPMS.formatPeriod(r._period)}</span></td>
+      </tr>`;
+    }).join('');
+  }
+
+  document.getElementById('pnNotFoundModal').style.display = 'flex';
+}
+
+function closePNNotFoundModal() {
+  document.getElementById('pnNotFoundModal').style.display = 'none';
+}
+
+// ── Unmapped Modal ────────────────────────────────────────────────
+
+function openUnmappedModal() {
+  const state = BPMS.getState();
+  let allOrders = [];
+  if (!currentPeriod) {
+    BPMS.getPeriods().forEach(p => {
+      (state.orders?.[p] || []).forEach(r => allOrders.push({ ...r, _period: p }));
+    });
+  } else {
+    allOrders = (state.orders?.[currentPeriod] || []).map(r => ({ ...r, _period: currentPeriod }));
+  }
+
+  // Compute PCS lines jika belum
+  allOrders.forEach(r => {
+    if (r._linesComputed) return;
+    const p = r._parsed || {};
+    const m = p.battType ? BPMS.findPCSMatches(p.battType, p.tech, p.plate, p.separator)[0] : null;
+    r._line1 = m?.line1 || '';
+    r._line2 = m?.line2 || '';
+    r._linesComputed = true;
+  });
+
+  const unmapped = allOrders.filter(r => !r._line1 && !r._line2);
+
+  document.getElementById('unmappedModalSub').textContent =
+    `${unmapped.length} item tidak ditemukan di Database PCS`;
+
+  const tbody = document.getElementById('unmappedBody');
+  if (!unmapped.length) {
+    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:32px;color:var(--text-4)">Tidak ada data unmapped</td></tr>`;
+  } else {
+    tbody.innerHTML = unmapped.map((r, i) => {
+      const p = r._parsed || {};
+      return `<tr style="border-bottom:1px solid var(--border-solid2)">
+        <td style="padding:6px 12px;color:var(--text-4)">${i + 1}</td>
+        <td style="padding:6px 12px">${r.pnCustomer || ''}</td>
+        <td style="padding:6px 12px;font-family:monospace;font-size:11px">${r.item || ''}</td>
+        <td style="padding:6px 12px;text-align:right;font-weight:600">${(r.qty || 0).toLocaleString()}</td>
+        <td style="padding:6px 12px;font-weight:600">${p.battType || '<span style="color:var(--text-4)">—</span>'}</td>
+        <td style="padding:6px 12px">${r.soldTo || ''}</td>
+        <td style="padding:6px 12px"><span class="badge badge-neutral">${BPMS.formatPeriod(r._period)}</span></td>
+      </tr>`;
+    }).join('');
+  }
+
+  document.getElementById('unmappedModal').style.display = 'flex';
+}
+
+function closeUnmappedModal() {
+  document.getElementById('unmappedModal').style.display = 'none';
 }
 
 // ── Upload Modal ─────────────────────────────────────────────────
@@ -985,11 +1183,15 @@ function renderOrders() {
   // ── Hitung stats ──────────────────────────────────────────────
   const totalQty   = filtered.reduce((s, r) => s + (r.qty || 0), 0);
   let   unmapped   = 0;
+  let   pnNotFound = 0;
   const activeLines = new Set();
   filtered.forEach(r => {
-    if (!r._line1 && !r._line2) { unmapped++; return; }
-    if (r._line1) activeLines.add(r._line1);
-    if (r._line2) activeLines.add(r._line2);
+    if (!r._line1 && !r._line2) unmapped++;
+    else {
+      if (r._line1) activeLines.add(r._line1);
+      if (r._line2) activeLines.add(r._line2);
+    }
+    if ((r.item || '').length < 27) pnNotFound++;
   });
   document.getElementById('statTotalItem').textContent  = filtered.length.toLocaleString();
   document.getElementById('statTotalQty').textContent   = totalQty.toLocaleString();
@@ -997,6 +1199,8 @@ function renderOrders() {
   document.getElementById('statUnmapped').textContent   = unmapped;
   document.getElementById('statUnmapped').style.color   = unmapped > 0 ? 'var(--red)' : 'var(--green)';
   document.getElementById('statUnmappedSub').textContent = unmapped > 0 ? 'Tidak ditemukan di PCS' : 'Semua terpetakan';
+  document.getElementById('statPNNotFound').textContent  = pnNotFound;
+  document.getElementById('statPNNotFound').style.color  = pnNotFound > 0 ? 'var(--red)' : 'var(--green)';
 
   const showPeriodCol = !currentPeriod;
   const o = 'class="th-orig"', c = 'class="th-calc"';
@@ -1333,7 +1537,7 @@ function renderResume() {
         html += `<td class="rt-no rt-center" rowspan="${rowspan}">${g.no}</td>`;
         html += `<td class="rt-group" rowspan="${rowspan}">${g.group}</td>`;
       }
-      html += `<td>${c.name}</td>`;
+      html += `<td class="rt-cust">${c.name}</td>`;
       html += `<td class="rt-num">${fmt(c.d)}</td>`;
       html += `<td class="rt-num">${fmt(c.u)}</td>`;
       html += `<td class="rt-num">${fmt(c.w)}</td>`;
@@ -1343,9 +1547,9 @@ function renderResume() {
         html += `<td class="rt-num" rowspan="${rowspan}" style="padding:3px 8px">
           <input type="number" class="rt-mb-input"
             value="${g.mb || ''}"
-            placeholder="—"
+            placeholder="${currentPeriod ? '—' : '-'}"
             data-key="${g.group.replace(/"/g,'&quot;')}"
-            oninput="onResumeMBChange(this)"/>
+            ${currentPeriod ? `oninput="onResumeMBChange(this)"` : 'disabled style="opacity:.4;cursor:not-allowed"'}/>
         </td>`;
         html += `<td class="rt-num rt-pct-cell" rowspan="${rowspan}"
           data-key="${g.group.replace(/"/g,'&quot;')}"
@@ -1376,10 +1580,11 @@ function onResumeMBChange(input) {
   const key = input.dataset.key;
   const val = Number(input.value) || 0;
 
-  // Simpan ke state
+  // Simpan ke state per periode
   const state = BPMS.getState();
   if (!state.resumeMB) state.resumeMB = {};
-  state.resumeMB[key] = val;
+  if (!state.resumeMB[currentPeriod]) state.resumeMB[currentPeriod] = {};
+  state.resumeMB[currentPeriod][key] = val;
   BPMS.saveState();
 
   // Update % cell tanpa re-render seluruh tabel
@@ -1399,7 +1604,7 @@ function onResumeMBChange(input) {
 // Definisi group & kategori untuk Resume Order
 const RESUME_GROUP_DEF = [
   { no: 1, label: 'AOP International', category: 'amb',
-    match: s => /aop international/i.test(s) || /int'l ex mar/i.test(s) },
+    match: s => /aop international/i.test(s) || /aop int'l/i.test(s) },
   { no: 2, label: 'AOP Domestic', category: 'amb',
     match: s => (/aop domestic/i.test(s) || /add order.*domestic/i.test(s) || /add order.*aspira ln/i.test(s)) && !/mcb/i.test(s) },
   { no: 3, label: 'Bina Pertiwi', category: 'amb',
@@ -1411,7 +1616,7 @@ const RESUME_GROUP_DEF = [
   { no: 6, label: 'MCB Domestic', category: 'mcb',
     match: s => /mcb/i.test(s) },
   { no: 7, label: 'e-Bike', category: 'ebike',
-    match: s => /roda pacific mandiri|juara bike|tangkas|motor anak bangsa/i.test(s) },
+    match: s => /roda pa[cs]ific mandiri|juara bike|tangkas|motor anak bangsa/i.test(s) },
   { no: 8, label: 'Lithium', category: 'lithium',
     match: s => /^(awi|akebono|ippi|bina pertiwi|etex building|inti pantja press industri|fscm|fni|nichirin indonesia|kharisma esa unggul|utpe|traktor nusantara)$/i.test(s) },
 ];
@@ -1426,7 +1631,9 @@ const RESUME_SUBTOTALS = [
 
 function buildResumeGroups() {
   const state    = BPMS.getState();
-  const resumeMB = state.resumeMB || {};
+  const resumeMB = currentPeriod
+    ? ((state.resumeMB || {})[currentPeriod] || {})
+    : {};
 
   // Kumpulkan order sesuai periode terpilih
   let allOrders = [];
@@ -1457,8 +1664,12 @@ function buildResumeGroups() {
   // Assign tiap Sold To ke group berdasarkan RESUME_GROUP_DEF (urutan = prioritas)
   const groupMap = new Map();
   custMap.forEach((vals, soldTo) => {
-    const def = RESUME_GROUP_DEF.find(d => d.match(soldTo))
-             || { no: 99, label: 'Uncategorized', category: 'other' };
+    let def = RESUME_GROUP_DEF.find(d => d.match(soldTo));
+    if (!def) {
+      def = vals.lithium > 0
+        ? RESUME_GROUP_DEF.find(d => d.label === 'Lithium')
+        : { no: 99, label: 'Uncategorized', category: 'other' };
+    }
     if (!groupMap.has(def.label)) {
       groupMap.set(def.label, { no: def.no, group: def.label, category: def.category, customers: [] });
     }
