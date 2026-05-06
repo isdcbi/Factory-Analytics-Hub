@@ -7,15 +7,81 @@
   <link rel="stylesheet" href="style.css"/>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <style>
-    .lvc-bar-wrap { display: flex; align-items: flex-end; gap: 16px; height: 280px; padding: 0 8px; }
-    .lvc-bar-item { display: flex; flex-direction: column; align-items: center; gap: 4px; flex: 1; min-width: 60px; max-width: 100px; position: relative; }
-    .lvc-bar-track { width: 100%; flex: 1; background: var(--bg-2); border: 1px solid var(--border-solid2); border-radius: 6px 6px 0 0; position: relative; overflow: visible; }
-    .lvc-bar-fill { position: absolute; bottom: 0; left: 0; right: 0; border-radius: 4px 4px 0 0; transition: height 0.4s ease; min-height: 2px; }
-    .lvc-bar-label { font-size: 11px; color: var(--text-4); }
-    .lvc-bar-pct { font-size: 12px; font-weight: 600; }
-    .ref-line { position: absolute; left: 0; right: 0; border-top: 1px dashed; z-index: 2; }
-    .ref-line-label { position: absolute; right: 4px; font-size: 9px; top: -10px; white-space: nowrap; font-weight: 500; }
-    .unmapped-badge { display: inline-flex; align-items: center; padding: 2px 7px; border-radius: 4px; font-size: 11px; background: rgba(224,108,0,0.12); color: var(--orange); border: 1px solid rgba(224,108,0,0.3); cursor: pointer; }
+    /* ── Process Card Layout ─────────────────────────────────────── */
+    .proc-card { margin-bottom: 20px; padding: 0 !important; overflow: hidden; }
+
+    .proc-card .card-header { padding: 14px 16px 12px; margin-bottom: 0; border-bottom: 1px solid var(--border-solid); }
+
+    .proc-body {
+      display: flex;
+      gap: 16px;
+      align-items: flex-start;
+      padding: 16px 16px 12px;
+    }
+
+    .proc-sidebar {
+      width: 124px;
+      flex-shrink: 0;
+      background: var(--bg-2);
+      border: 1px solid var(--border-solid);
+      border-radius: 8px;
+      padding: 14px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+    }
+
+    .proc-stat {
+      padding: 10px 0;
+    }
+    .proc-stat + .proc-stat {
+      border-top: 1px solid var(--border-solid);
+    }
+
+    .proc-stat-label {
+      font-size: 9px;
+      font-weight: 700;
+      color: var(--text-4);
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      margin-bottom: 3px;
+    }
+
+    .proc-stat-value {
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--text-1);
+      line-height: 1;
+      letter-spacing: -0.02em;
+    }
+
+    .proc-stat-sub {
+      font-size: 10px;
+      color: var(--text-4);
+      margin-top: 2px;
+    }
+
+    .proc-chart-area {
+      flex: 1;
+      min-width: 0;
+    }
+
+    /* ── Unit badge ─────────────────────────────────────────────── */
+    .proc-unit {
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 4px;
+      background: var(--bg-2);
+      color: var(--text-4);
+      border: 1px solid var(--border-solid);
+      margin-left: 4px;
+    }
+
+    .cell-ok   { color: #16a34a; }
+    .cell-warn { color: #ea580c; }
+    .cell-over { color: #dc2626; }
+    .cell-crit { color: #991b1b; font-weight: 700 !important; }
+    .cell-zero { color: var(--text-4); }
   </style>
 </head>
 <body>
@@ -28,285 +94,501 @@
       <!-- Controls -->
       <div class="flex items-center gap-3 mb-6 flex-wrap">
         <div class="period-bar" style="margin-bottom:0">
-          <span class="period-label">Periode:</span>
-          <select id="periodSelect" class="form-control" style="width:auto">
-            <option value="">— Pilih Periode —</option>
+          <span class="period-label">Tahun:</span>
+          <select id="yearSelect" class="form-control" style="width:auto">
+            <option value="">— Pilih Tahun —</option>
           </select>
         </div>
         <div class="ml-auto flex gap-2">
           <button class="btn btn-ghost btn-sm" id="exportBtn">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+              <polyline points="7 10 12 15 17 10"/>
+              <line x1="12" y1="15" x2="12" y2="3"/>
+            </svg>
             Export
           </button>
         </div>
       </div>
 
-      <!-- Stats -->
-      <div class="stats-grid mb-6" id="lvcStats">
-        <div class="stat-card"><div class="stat-label">Total Order</div><div class="stat-value" id="sOrders">—</div></div>
-        <div class="stat-card"><div class="stat-label">Total Qty</div><div class="stat-value" id="sQty">—</div></div>
-        <div class="stat-card"><div class="stat-label">Hari Kerja</div><div class="stat-value" id="sDays">—</div></div>
-        <div class="stat-card"><div class="stat-label">Unmapped</div><div class="stat-value" id="sUnmapped">—</div><div class="stat-sub">Item tanpa PCS match</div></div>
-      </div>
-
-      <!-- Chart -->
-      <div class="card mb-6">
-        <div class="card-header">
-          <span class="card-title">Loading vs Capacity Chart</span>
-          <div class="flex gap-3 text-sm" style="font-size:11px;color:var(--text-4)">
-            <span style="display:flex;align-items:center;gap:4px"><span style="width:12px;height:2px;background:var(--red);display:inline-block;border-radius:1px"></span>100% (Full)</span>
-            <span style="display:flex;align-items:center;gap:4px"><span style="width:12px;height:2px;background:var(--orange);display:inline-block;border-radius:1px"></span>85% (Warning)</span>
-          </div>
-        </div>
-        <div id="lvcChart">
-          <div class="empty-state"><div class="empty-icon">📊</div><div class="empty-title">Pilih periode untuk melihat chart</div></div>
+      <!-- Process Cards Container -->
+      <div id="procCards">
+        <div class="empty-state">
+          <div class="empty-icon">📊</div>
+          <div class="empty-title">Pilih tahun untuk melihat analisis LVC</div>
         </div>
       </div>
 
-      <!-- Unmapped panel -->
-      <div id="unmappedPanel" class="card mb-6" style="display:none">
-        <div class="card-header">
-          <span class="card-title" style="color:var(--orange)">⚠ Item Tidak Termapping</span>
-          <button class="btn btn-ghost btn-xs" onclick="document.getElementById('unmappedTable').parentElement.style.display = document.getElementById('unmappedTable').parentElement.style.display === 'none' ? '' : 'none'">Toggle</button>
-        </div>
-        <p class="text-sm text-muted mb-3" style="margin-top:-8px">Item berikut tidak ditemukan di Database PCS. Pastikan Battery Type cocok.</p>
-        <div class="table-wrap">
-          <div class="table-scroll">
-            <table><thead><tr><th>ITEM</th><th>Battery Type</th><th>Tech</th><th>Separator</th><th>Plate</th><th>Qty</th></tr></thead>
-            <tbody id="unmappedTable"></tbody></table>
-          </div>
-        </div>
-      </div>
-
-      <!-- Detail Table -->
-      <div class="card">
-        <div class="card-header">
-          <span class="card-title">Detail LVC per LINE</span>
-        </div>
-        <div class="table-wrap">
-          <div class="table-scroll">
-            <table id="lvcTable">
-              <thead>
-                <tr>
-                  <th>LINE</th>
-                  <th>Total Qty</th>
-                  <th>Processing Time (Jam)</th>
-                  <th>Kapasitas Total (Jam)</th>
-                  <th>Loading %</th>
-                  <th>Status</th>
-                  <th>Shift Aktif</th>
-                  <th>Hari Kerja</th>
-                  <th>Menit/Hari</th>
-                </tr>
-              </thead>
-              <tbody id="lvcBody">
-                <tr><td colspan="9"><div class="empty-state"><div class="empty-icon">📈</div><div class="empty-title">Pilih periode untuk kalkulasi LVC</div></div></td></tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
     </div>
   </div>
 </div>
 
 <script src="shared-components.js"></script>
 <script>
-let currentPeriod = '';
-let lvcResults    = [];
+// ── Constants ──────────────────────────────────────────────────────────
+const MONTHS_ABR = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
 
+const LVC_PROCESSES = [
+  {
+    key: 'assembling', label: 'Assembling', unit: 'Jam/Bln',
+    lines: ['Line 1','Line 2','Line 3','Line 4','Line 5','Line 6','Line 7','Line MCB','Line IB','Line Lithium'],
+    qtyLineRange: [1, 7],
+    loadType: 'battery',
+    loadQtyFrom: 'resumeAMB',
+  },
+  {
+    key: 'charging', label: 'Charging', unit: 'Jam/Bln',
+    lines: ['Line Charger'], loadType: 'battery',
+    qtyLineRange: [1, 7], specCodeFilter: 'W', qtyOnly: true,
+  },
+  {
+    key: 'formation', label: 'Formation', unit: 'Panel/Bln',
+    lines: ['Formation'], loadType: 'battery',
+    loadQtyFrom: 'formationPanel', qtyOnly: true,
+    loadLabelText: 'Loading (panel)', loadUnitText: 'panel',
+  },
+  {
+    key: 'pasting_punching', label: 'Pasting Punching', unit: 'Jam/Bln',
+    lines: ['Pasting Punching'], loadType: 'plate',
+  },
+  {
+    key: 'pasting_casting', label: 'Pasting Casting', unit: 'Jam/Bln',
+    lines: ['Pasting Casting'], loadType: 'plate',
+  },
+  {
+    key: 'ball_mill', label: 'Ball Mill', unit: 'Jam/Bln',
+    lines: ['Ball Mill'], loadType: 'pule',
+  },
+  {
+    key: 'grid_punching', label: 'Grid Punching', unit: 'Jam/Bln',
+    lines: ['Grid Punching'], loadType: 'plate',
+  },
+  {
+    key: 'grid_casting', label: 'Grid Casting', unit: 'Jam/Bln',
+    lines: ['Grid Casting'], loadType: 'plate',
+  },
+];
+
+let currentYear = '';
+
+// ── Page Init ──────────────────────────────────────────────────────────
 function pageInit() {
-  document.getElementById('topbarMount').innerHTML = BPMS.renderTopbar('LVC Analysis',
-    '<span class="text-muted text-sm">Loading vs Capacity</span>');
+  try {
+    document.getElementById('topbarMount').innerHTML = BPMS.renderTopbar(
+      'LVC Analysis', '<span class="text-muted text-sm">Loading vs Capacity</span>');
 
-  const sel = document.getElementById('periodSelect');
-  BPMS.getPeriods().forEach(p => {
-    const opt = document.createElement('option');
-    opt.value = p; opt.textContent = BPMS.formatPeriod(p) + ' (' + p + ')';
-    sel.appendChild(opt);
-  });
+    const years = getAvailableYears();
+    const sel   = document.getElementById('yearSelect');
+    years.forEach(y => {
+      const opt = document.createElement('option');
+      opt.value = y; opt.textContent = y;
+      sel.appendChild(opt);
+    });
 
-  sel.addEventListener('change', () => { currentPeriod = sel.value; if (currentPeriod) calcAndRender(); });
-  document.getElementById('exportBtn').addEventListener('click', exportExcel);
+    sel.addEventListener('change', () => { currentYear = sel.value; renderAll(); });
+    document.getElementById('exportBtn').addEventListener('click', exportExcel);
 
-  const current = BPMS.getCurrentPeriod();
-  if (BPMS.getPeriods().includes(current)) { sel.value = current; currentPeriod = current; calcAndRender(); }
+    // Auto-select most recent year
+    if (years.length) {
+      sel.value = years[0];
+      currentYear = years[0];
+      renderAll();
+    }
+  } catch (err) {
+    console.error('[LVC] pageInit error:', err);
+    document.getElementById('procCards').innerHTML =
+      `<div class="empty-state"><div class="empty-icon">⚠️</div><div class="empty-title">Init error: ${err.message}</div></div>`;
+  }
 }
 
-function calcAndRender() {
-  const state  = BPMS.getState();
-  const orders = state.orders?.[currentPeriod] || [];
-  const days   = BPMS.getWorkDayCount(currentPeriod);
-
-  const totalQty = orders.reduce((s, o) => s + (Number(o.qty)||0), 0);
-  document.getElementById('sOrders').textContent = orders.length.toLocaleString();
-  document.getElementById('sQty').textContent    = totalQty.toLocaleString();
-  document.getElementById('sDays').textContent   = days;
-
-  const { results, unmapped } = BPMS.calcLVC(currentPeriod);
-  lvcResults = results;
-
-  document.getElementById('sUnmapped').textContent = unmapped.length;
-
-  renderChart(results, state);
-  renderTable(results, state);
-  renderUnmapped(unmapped);
+function getAvailableYears() {
+  const state = BPMS.getState();
+  const ySet  = new Set();
+  const addPeriods = obj => Object.keys(obj || {}).forEach(p => { const y = p.split('-')[0]; if (y) ySet.add(y); });
+  addPeriods(state.orders);
+  addPeriods(state.capacity);
+  addPeriods(state.workCalendar);
+  if (!ySet.size) ySet.add(String(new Date().getFullYear()));
+  return [...ySet].sort().reverse();
 }
 
-// ── SVG-based bar chart ───────────────────────────────────────────
+// ── Calculation ────────────────────────────────────────────────────────
 
-function renderChart(results, state) {
-  const W = 760, H = 300;
-  const mL = 56, mR = 20, mT = 36, mB = 50;
-  const chartW = W - mL - mR;
-  const chartH = H - mT - mB;
+// Pola AMB — sama dengan RESUME_GROUP_DEF category:'amb' di data-order.html
+function isAMBSoldTo(soldTo) {
+  const s = String(soldTo || '').trim();
+  if (/aop international/i.test(s) || /aop int'l/i.test(s)) return true;
+  if ((/aop domestic/i.test(s) || /add order.*domestic/i.test(s) || /add order.*aspira ln/i.test(s)) && !/mcb/i.test(s)) return true;
+  if (/bina pertiwi/i.test(s) && s.toLowerCase() !== 'bina pertiwi') return true;
+  if (/^adm\b/i.test(s)) return true;
+  if (/^(isuzu|hyundai)$/i.test(s)) return true;
+  return false;
+}
 
-  const maxLoad = Math.max(120, ...results.map(r => r.loading));
-  const sy = v => chartH - (v / maxLoad) * chartH;
+function buildPlateMap() {
+  const plateRows = BPMS.getState().dbPlateInfor || [];
+  const map = new Map();
+  if (!plateRows.length) return map;
+  const s    = plateRows[0];
+  const keys = Object.keys(s);
+  const fk   = (...pats) => keys.find(k => pats.some(p => k.toLowerCase().includes(p.toLowerCase()))) || null;
+  const kKey = fk('item data infor') || keys[1];
+  const kQtP = fk('qty plate positif', 'qty positif') || keys[3];
+  const kQtN = fk('qty plate negatif', 'qty negatif') || keys[5];
+  plateRows.forEach(row => {
+    const key = String(row[kKey] ?? '').trim();
+    if (!key) return;
+    map.set(key, { qtyPos: Number(row[kQtP]) || 0, qtyNeg: Number(row[kQtN]) || 0 });
+  });
+  return map;
+}
 
-  const barsPerLine = 1;
-  const totalBars   = results.length;
-  const barSlot     = chartW / totalBars;
-  const barW        = Math.min(48, barSlot * 0.55);
+function calcMonthData(period, proc) {
+  const state   = BPMS.getState();
+  const orders  = state.orders?.[period] || [];
+  const lineSet = new Set(proc.lines);
 
-  let svg = `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="max-width:100%;overflow:visible">`;
+  // Numeric range check for qtyLineRange (works for "Line 1", "1", "line1", etc.)
+  const [qtyMin, qtyMax] = proc.qtyLineRange || [null, null];
+  const inQtyRange = lineName => {
+    if (qtyMin == null) return false;
+    const n = parseInt(String(lineName || '').replace(/[^0-9]/g, ''), 10);
+    return n >= qtyMin && n <= qtyMax;
+  };
 
-  // Grid lines + Y labels
-  [0, 25, 50, 75, 100, 125].forEach(v => {
-    if (v > maxLoad + 10) return;
-    const y = sy(v) + mT;
-    svg += `<line x1="${mL}" y1="${y}" x2="${W-mR}" y2="${y}" stroke="rgba(0,0,0,0.06)" stroke-width="1"/>
-      <text x="${mL-5}" y="${y+4}" text-anchor="end" font-size="10" fill="#9b9fa8">${v}%</text>`;
+  let loadingHours = 0;
+
+  // ── Qty: source-specific loading quantity ────────────────────────────────
+  let loadingQty = 0;
+  if (proc.loadQtyFrom === 'resumeAMB') {
+    loadingQty = orders.reduce((s, r) => isAMBSoldTo(r.soldTo) ? s + (Number(r.qty) || 0) : s, 0);
+  } else if (proc.loadQtyFrom === 'formationPanel') {
+    const plateMap = buildPlateMap();
+    for (const ord of orders) {
+      const qty = Number(ord.qty) || 0;
+      if (!qty) continue;
+      if ((ord.item || '').charAt(4).toUpperCase() !== 'D') continue;
+      const pv = plateMap.get((ord.item || '').substring(2, 19)) || {};
+      loadingQty += ((pv.qtyPos || 0) + (pv.qtyNeg || 0)) * qty;
+    }
+  }
+
+  for (const ord of orders) {
+    const qty = Number(ord.qty) || 0;
+    if (!qty) continue;
+
+    const parsed = ord._parsed || BPMS.parseItemString(ord.item);
+    if (!parsed || !parsed.battType) continue;
+
+    // ── Hours: PCS-based ─────────────────────────────────────────────────
+    const matches = BPMS.findPCSMatches(parsed.battType, parsed.tech, parsed.plate, parsed.separator);
+    if (!matches.length) continue;
+    const pcs = matches[0];
+
+    if (pcs.line1) {
+      const hoursMatch = lineSet.has(pcs.line1) || (!proc.qtyOnly && inQtyRange(pcs.line1));
+      if (hoursMatch) {
+        const ct = Number(pcs.ct1) || 0;
+        if (ct) loadingHours += (qty * ct) / 3600;
+      }
+      // Qty via qtyLineRange (for processes without loadQtyFrom)
+      if (!proc.loadQtyFrom && inQtyRange(pcs.line1)) {
+        const specOk = !proc.specCodeFilter || (ord.item || '').charAt(4).toUpperCase() === proc.specCodeFilter;
+        if (specOk) loadingQty += qty;
+      }
+    }
+    if (pcs.line2) {
+      const hoursMatch2 = lineSet.has(pcs.line2) || (!proc.qtyOnly && inQtyRange(pcs.line2));
+      if (hoursMatch2) {
+        const ct = Number(pcs.ct2) || 0;
+        if (ct) loadingHours += (qty * ct) / 3600;
+      }
+    }
+  }
+
+  const workdays = BPMS.getWorkDayCount(period);
+
+  let installedCap = 0;
+  for (const line of proc.lines) {
+    installedCap += BPMS.getCapacityHours(period, line);
+  }
+
+  const nLines = proc.lines.length;
+  const ot2Cap = installedCap + 2 * workdays * nLines;
+  const ot4Cap = installedCap + 4 * workdays * nLines;
+
+  return { loadingHours, loadingQty, installedCap, ot2Cap, ot4Cap, workdays };
+}
+
+function getYearData(year, proc) {
+  return MONTHS_ABR.map((_, i) => {
+    const period = `${year}-${String(i + 1).padStart(2, '0')}`;
+    return calcMonthData(period, proc);
+  });
+}
+
+// ── Helpers ────────────────────────────────────────────────────────────
+function barColor(pct) {
+  if (pct > 120) return '#991b1b';
+  if (pct > 100) return '#dc2626';
+  if (pct > 85)  return '#ea580c';
+  return '#16a34a';
+}
+
+function cellClass(pct) {
+  if (!pct) return 'cell-zero';
+  if (pct > 120) return 'cell-crit';
+  if (pct > 100) return 'cell-over';
+  if (pct > 85)  return 'cell-warn';
+  return 'cell-ok';
+}
+
+function fmtH(v) {
+  if (!v || v < 0.5) return '—';
+  return Math.round(v).toLocaleString('id-ID');
+}
+
+function niceMax(raw) {
+  if (raw <= 0) return 100;
+  const rough = raw * 1.12;
+  const mag   = Math.pow(10, Math.floor(Math.log10(rough)));
+  const steps = [1, 2, 2.5, 5, 10];
+  for (const s of steps) {
+    const candidate = Math.ceil(rough / (s * mag)) * s * mag;
+    if (candidate >= rough) return candidate;
+  }
+  return Math.ceil(rough / mag) * mag;
+}
+
+// ── SVG Chart + embedded table ─────────────────────────────────────────
+function makeChartSVG(yearData, useQty, loadLabel) {
+  const W = 724;
+  const mL = 110, mR = 6, mT = 52, mB = 8;
+  const cW  = W - mL - mR;    // 608
+  const cH  = 200 - mT - mB;  // 140
+  const ROW_H   = 20;
+  const MNTH_H  = 18;
+  const TBL_PAD = 6;
+  const N_ROWS  = 5;
+  const H_total = 200 + TBL_PAD + MNTH_H + N_ROWS * ROW_H + 4; // 328
+
+  const loadVal = d => useQty ? d.loadingQty : d.loadingHours;
+
+  const allVals = yearData.flatMap(d => [loadVal(d), d.installedCap, d.ot4Cap]);
+  const maxVal  = niceMax(Math.max(0, ...allVals));
+
+  const sy   = v => mT + cH - Math.min(v / maxVal, 1.06) * cH;
+  const slot = cW / 12;
+  const bw   = Math.min(22, slot * 0.42);
+
+  const tickStep = maxVal / 4;
+  const ticks = [0, 1, 2, 3, 4].map(i => Math.round(tickStep * i));
+
+  let svg = `<svg viewBox="0 0 ${W} ${H_total}" xmlns="http://www.w3.org/2000/svg" style="width:100%;display:block;overflow:visible">`;
+
+  // ── Grid + Y labels ───────────────────────────────────────────────────
+  ticks.forEach(v => {
+    const y = sy(v);
+    if (y > mT + cH + 2 || y < mT - 5) return;
+    svg += `<line x1="${mL}" y1="${y}" x2="${W - mR}" y2="${y}" stroke="rgba(0,0,0,0.05)" stroke-width="1"/>`;
+    const lbl = v >= 1000 ? (v / 1000).toFixed(v % 1000 === 0 ? 0 : 1) + 'k' : String(v);
+    svg += `<text x="${mL - 4}" y="${y + 3.5}" text-anchor="end" font-size="9" fill="#9b9fa8">${lbl}</text>`;
   });
 
-  // Axes
-  svg += `<line x1="${mL}" y1="${mT}" x2="${mL}" y2="${mT+chartH}" stroke="rgba(0,0,0,0.15)" stroke-width="1"/>
-    <line x1="${mL}" y1="${mT+chartH}" x2="${W-mR}" y2="${mT+chartH}" stroke="rgba(0,0,0,0.15)" stroke-width="1"/>`;
+  // ── Axis lines ────────────────────────────────────────────────────────
+  svg += `<line x1="${mL}" y1="${mT}" x2="${mL}" y2="${mT + cH}" stroke="rgba(0,0,0,0.12)" stroke-width="1"/>`;
+  svg += `<line x1="${mL}" y1="${mT + cH}" x2="${W - mR}" y2="${mT + cH}" stroke="rgba(0,0,0,0.12)" stroke-width="1"/>`;
 
-  // Reference lines
-  const refs = [{ v: 100, col: '#dc2626', lbl: '100%' }, { v: 85, col: '#c05a00', lbl: '85%' }];
-  refs.forEach(({ v, col, lbl }) => {
-    const y = sy(v) + mT;
-    svg += `<line x1="${mL}" y1="${y}" x2="${W-mR}" y2="${y}" stroke="${col}" stroke-width="1" stroke-dasharray="6,4" opacity="0.7"/>
-      <text x="${W-mR+3}" y="${y+4}" font-size="9" fill="${col}" opacity="0.8">${lbl}</text>`;
-  });
+  const instPts = [], ot2Pts = [], ot4Pts = [], pcts = [];
 
-  // Shift capacity reference lines per bar
-  results.forEach((r, i) => {
-    const cx = mL + barSlot * i + barSlot / 2;
-    const x  = cx - barW / 2;
+  // ── Bars + month headers ──────────────────────────────────────────────
+  for (let i = 0; i < 12; i++) {
+    const d  = yearData[i];
+    const cx = mL + slot * i + slot / 2;
+    const bx = cx - bw / 2;
 
-    // Background track
-    svg += `<rect x="${x}" y="${mT}" width="${barW}" height="${chartH}" fill="rgba(0,0,0,0.03)" rx="4"/>`;
+    svg += `<text x="${cx}" y="${mT - 32}" text-anchor="middle" font-size="10" font-weight="600" fill="#374151">${MONTHS_ABR[i].toUpperCase()}</text>`;
+    svg += `<text x="${cx}" y="${mT - 18}" text-anchor="middle" font-size="9" fill="#9b9fa8">${d.workdays ? d.workdays + 'd' : ''}</text>`;
+    svg += `<rect x="${bx}" y="${mT}" width="${bw}" height="${cH}" fill="rgba(0,0,0,0.02)" rx="2"/>`;
 
-    if (r.capacityHours > 0) {
-      // Shift capacity lines (S1, S1+S2 as fraction of total capacity)
-      const cfg = BPMS.getState().capacity?.[currentPeriod]?.[r.line] || { s1: true, s2: true, s3: false };
-      const wdays = BPMS.getWorkDayCount(currentPeriod);
-      const totalMins = (cfg.s1 ? 435 : 0) + (cfg.s2 ? 405 : 0) + (cfg.s3 ? 370 : 0);
+    const lv  = loadVal(d);
+    const pct = d.installedCap > 0 ? (lv / d.installedCap) * 100 : 0;
+    pcts.push(pct);
 
-      [
-        { mins: cfg.s1 ? 435 : 0, col: 'rgba(113,112,255,0.5)', lbl: 'S1' },
-        { mins: (cfg.s1 ? 435 : 0) + (cfg.s2 ? 405 : 0), col: 'rgba(113,112,255,0.7)', lbl: 'S1+S2' },
-      ].forEach(({ mins, col, lbl }) => {
-        if (!mins) return;
-        const capHrs = (mins * wdays) / 60;
-        const pct    = (capHrs / r.capacityHours) * 100;
-        const y      = sy(pct) + mT;
-        svg += `<line x1="${x}" y1="${y}" x2="${x+barW}" y2="${y}" stroke="${col}" stroke-width="1" stroke-dasharray="3,2"/>`;
-      });
+    if (lv >= 1) {
+      const bh  = Math.min(lv / maxVal, 1.06) * cH;
+      const by  = mT + cH - bh;
+      const col = barColor(pct);
+      svg += `<rect x="${bx}" y="${by}" width="${bw}" height="${bh}" fill="${col}" rx="2" opacity="0.82"/>`;
+      if (pct >= 3) {
+        const labelY = Math.max(by - 3, mT + 9);
+        svg += `<text x="${cx}" y="${labelY}" text-anchor="middle" font-size="8" fill="${col}" font-weight="600">${Math.round(pct)}%</text>`;
+      }
     }
 
-    // Bar fill
-    const pct = Math.min(r.loading, maxLoad);
-    const bh  = (pct / maxLoad) * chartH;
-    const by  = mT + chartH - bh;
-    const col = r.loading > 100 ? '#dc2626' : r.loading > 85 ? '#c05a00' : '#16a34a';
+    if (d.installedCap >= 1) instPts.push(`${cx},${sy(d.installedCap)}`);
+    if (d.ot2Cap >= 1)       ot2Pts.push(`${cx},${sy(d.ot2Cap)}`);
+    if (d.ot4Cap >= 1)       ot4Pts.push(`${cx},${sy(d.ot4Cap)}`);
+  }
 
-    svg += `<rect x="${x}" y="${by}" width="${barW}" height="${bh}" fill="${col}" opacity="0.9" rx="4"/>`;
+  // ── Capacity polylines ────────────────────────────────────────────────
+  const poly = (pts, stroke, dash) => pts.length < 2 ? '' :
+    `<polyline points="${pts.join(' ')}" fill="none" stroke="${stroke}" stroke-width="1.5"${dash ? ` stroke-dasharray="${dash}"` : ''}/>`;
+  svg += poly(instPts, '#374151');
+  svg += poly(ot2Pts,  '#2563eb', '6,3');
+  svg += poly(ot4Pts,  '#1e3a5f', '2,3');
 
-    // Value label
-    if (r.processingHours > 0) {
-      svg += `<text x="${cx}" y="${by - 6}" text-anchor="middle" font-size="10" fill="${col}" font-weight="600">${r.loading.toFixed(1)}%</text>`;
+  // ── Embedded data table ───────────────────────────────────────────────
+  const mY0 = 200 + TBL_PAD;  // month-header row start
+  const tY0 = mY0 + MNTH_H;   // data rows start
+
+  // Separator between chart and table
+  svg += `<line x1="0" y1="${200 + 2}" x2="${W}" y2="${200 + 2}" stroke="rgba(0,0,0,0.10)" stroke-width="1"/>`;
+
+  // Month header row
+  svg += `<rect x="0" y="${mY0}" width="${W}" height="${MNTH_H}" fill="rgba(0,0,0,0.045)"/>`;
+  for (let i = 0; i < 12; i++) {
+    const cx = mL + slot * i + slot / 2;
+    svg += `<text x="${cx}" y="${mY0 + MNTH_H - 5}" text-anchor="middle" font-size="9" font-weight="700" fill="#374151">${MONTHS_ABR[i].toUpperCase()}</text>`;
+  }
+  svg += `<line x1="0" y1="${mY0 + MNTH_H}" x2="${W}" y2="${mY0 + MNTH_H}" stroke="rgba(0,0,0,0.10)" stroke-width="1"/>`;
+
+  const tblRows = [
+    { label: loadLabel,            isLoad: true,
+      sym: { type: 'rect', fill: '#5e6ad2' },
+      vals: yearData.map((d, i) => ({ v: fmtH(loadVal(d)), pct: pcts[i] })) },
+    { label: 'Installed Capacity', isLoad: false,
+      sym: { type: 'line', stroke: '#374151', dash: null },
+      vals: yearData.map(d => fmtH(d.installedCap)) },
+    { label: 'Setting 2OT',       isLoad: false,
+      sym: { type: 'line', stroke: '#2563eb', dash: '5,2' },
+      vals: yearData.map(d => fmtH(d.ot2Cap)) },
+    { label: 'Setting 4OT',       isLoad: false,
+      sym: { type: 'line', stroke: '#1e3a5f', dash: '2,2' },
+      vals: yearData.map(d => fmtH(d.ot4Cap)) },
+    { label: 'Working Days',      isLoad: false,
+      sym: null,
+      vals: yearData.map(d => String(d.workdays || '—')) },
+  ];
+
+  const drawSym = (sym, rowY) => {
+    if (!sym) return '';
+    const midY = rowY + ROW_H / 2;
+    if (sym.type === 'rect')
+      return `<rect x="3" y="${midY - 4}" width="14" height="7" fill="${sym.fill}" rx="1" opacity="0.85"/>`;
+    const da = sym.dash ? ` stroke-dasharray="${sym.dash}"` : '';
+    return `<line x1="3" y1="${midY}" x2="17" y2="${midY}" stroke="${sym.stroke}" stroke-width="2"${da}/>`;
+  };
+
+  tblRows.forEach((row, ri) => {
+    const rowY  = tY0 + ri * ROW_H;
+    const textY = rowY + ROW_H - 6;
+    if (ri % 2 === 0)
+      svg += `<rect x="0" y="${rowY}" width="${W}" height="${ROW_H}" fill="rgba(0,0,0,0.025)"/>`;
+    svg += `<line x1="0" y1="${rowY}" x2="${W}" y2="${rowY}" stroke="rgba(0,0,0,0.05)" stroke-width="0.5"/>`;
+
+    svg += drawSym(row.sym, rowY);
+    svg += `<text x="22" y="${textY}" text-anchor="start" font-size="9" fill="${row.isLoad ? '#374151' : '#6b7280'}" font-weight="${row.isLoad ? '600' : '400'}">${row.label}</text>`;
+
+    for (let i = 0; i < 12; i++) {
+      const cx  = mL + slot * i + slot / 2;
+      const raw = row.isLoad ? row.vals[i] : { v: row.vals[i], pct: 0 };
+      const col = row.isLoad ? (raw.pct > 0 ? barColor(raw.pct) : '#374151') : '#374151';
+      svg += `<text x="${cx}" y="${textY}" text-anchor="middle" font-size="9" fill="${col}" font-weight="${row.isLoad ? '600' : '400'}">${raw.v}</text>`;
     }
-
-    // X label
-    svg += `<text x="${cx}" y="${mT + chartH + 16}" text-anchor="middle" font-size="11" fill="#6c717d">${r.line.replace('Line ', 'L')}</text>`;
   });
 
+  svg += `<line x1="0" y1="${mY0 + MNTH_H + N_ROWS * ROW_H}" x2="${W}" y2="${mY0 + MNTH_H + N_ROWS * ROW_H}" stroke="rgba(0,0,0,0.10)" stroke-width="1"/>`;
   svg += '</svg>';
-  document.getElementById('lvcChart').innerHTML = `<div style="overflow-x:auto;padding:8px 0">${svg}</div>`;
+  return svg;
 }
 
-function renderTable(results, state) {
-  const body = document.getElementById('lvcBody');
-  if (!results.length) {
-    body.innerHTML = '<tr><td colspan="9"><div class="empty-state"><div class="empty-icon">📈</div><div class="empty-title">Tidak ada data</div></div></td></tr>';
+// ── Render Process Card ────────────────────────────────────────────────
+function renderProcessCard(proc, yearData) {
+  const useQty    = proc.qtyLineRange != null || !!proc.loadQtyFrom;
+  const loadVal   = d => useQty ? d.loadingQty : d.loadingHours;
+  const loadLabel = proc.loadLabelText || (useQty ? 'Loading (pcs)' : 'Loading (Jam)');
+
+  const totalLoad = yearData.reduce((s, d) => s + loadVal(d), 0);
+  const totalCap  = yearData.reduce((s, d) => s + d.installedCap, 0);
+  const avgUtil   = totalCap > 0 ? (totalLoad / totalCap * 100) : 0;
+  const utilColor = avgUtil > 100 ? '#dc2626' : avgUtil > 85 ? '#ea580c' : '#16a34a';
+  const fmtStat   = v => v >= 1000 ? (v / 1000).toFixed(1) + 'k' : Math.round(v).toString();
+  const loadUnit  = proc.loadUnitText || (useQty ? 'pcs' : 'Jam');
+
+  const sidebar = `
+    <div class="proc-sidebar">
+      <div class="proc-stat">
+        <div class="proc-stat-label">Σ LOAD</div>
+        <div class="proc-stat-value">${fmtStat(totalLoad)}</div>
+        <div class="proc-stat-sub">${loadUnit}</div>
+      </div>
+      <div class="proc-stat">
+        <div class="proc-stat-label">Σ CAP</div>
+        <div class="proc-stat-value">${fmtStat(totalCap)}</div>
+        <div class="proc-stat-sub">Jam</div>
+      </div>
+      <div class="proc-stat">
+        <div class="proc-stat-label">AVG UTIL</div>
+        <div class="proc-stat-value" style="color:${utilColor}">${avgUtil.toFixed(1)}%</div>
+        <div class="proc-stat-sub">Rata-rata</div>
+      </div>
+    </div>`;
+
+  return `
+    <div class="card proc-card">
+      <div class="card-header">
+        <span class="card-title">${proc.label}</span>
+        <span class="proc-unit">${proc.unit}</span>
+      </div>
+      <div class="proc-body">
+        ${sidebar}
+        <div class="proc-chart-area">
+          ${makeChartSVG(yearData, useQty, loadLabel)}
+        </div>
+      </div>
+    </div>`;
+}
+
+// ── Render All ─────────────────────────────────────────────────────────
+function renderAll() {
+  const container = document.getElementById('procCards');
+  if (!currentYear) {
+    container.innerHTML = `<div class="empty-state"><div class="empty-icon">📊</div><div class="empty-title">Pilih tahun untuk melihat analisis LVC</div></div>`;
     return;
   }
 
-  body.innerHTML = results.map(r => {
-    const cfg = state.capacity?.[currentPeriod]?.[r.line] || { s1: true, s2: true, s3: false };
-    const shifts = [cfg.s1 && 'S1', cfg.s2 && 'S2', cfg.s3 && 'S3'].filter(Boolean).join('+') || '—';
-    const mins   = BPMS.shiftMinutes(cfg);
-    const days   = BPMS.getWorkDayCount(currentPeriod);
-    const badgeCls = r.status === 'OVERLOADED' ? 'badge-danger' : r.status === 'WARNING' ? 'badge-warning' : 'badge-ok';
-    const rowCls   = r.status === 'OVERLOADED' ? 'row-highlight-danger' : r.status === 'WARNING' ? 'row-highlight-warning' : '';
-    const loadStr  = r.processingHours > 0 ? r.loading.toFixed(2) + '%' : '—';
-
-    return `<tr class="${rowCls}">
-      <td><strong>${r.line}</strong></td>
-      <td>${BPMS.fmtInt(r.qty)}</td>
-      <td class="font-mono">${BPMS.fmtNum(r.processingHours, 4)}</td>
-      <td class="font-mono">${BPMS.fmtNum(r.capacityHours, 2)}</td>
-      <td><strong class="${r.loading > 100 ? 'text' : ''}" style="${r.loading > 100 ? 'color:var(--red)' : r.loading > 85 ? 'color:var(--orange)' : ''}">${loadStr}</strong></td>
-      <td><span class="badge ${badgeCls}">${r.processingHours > 0 ? r.status : 'IDLE'}</span></td>
-      <td>${shifts}</td>
-      <td>${days}</td>
-      <td class="font-mono">${mins}</td>
-    </tr>`;
-  }).join('');
+  try {
+    let html = '';
+    for (const proc of LVC_PROCESSES) {
+      const yearData = getYearData(currentYear, proc);
+      html += renderProcessCard(proc, yearData);
+    }
+    container.innerHTML = html;
+  } catch (err) {
+    console.error('[LVC] renderAll error:', err);
+    container.innerHTML = `<div class="empty-state"><div class="empty-icon">⚠️</div><div class="empty-title">Gagal render: ${err.message}</div><div class="empty-sub" style="font-size:11px;color:var(--text-4);margin-top:6px">Lihat Console (F12) untuk detail.</div></div>`;
+  }
 }
 
-function renderUnmapped(unmapped) {
-  const panel = document.getElementById('unmappedPanel');
-  if (!unmapped.length) { panel.style.display = 'none'; return; }
-  panel.style.display = '';
-  document.getElementById('unmappedTable').innerHTML = unmapped.map(r => {
-    const p = r._parsed || BPMS.parseItemString(r.item) || {};
-    return `<tr>
-      <td class="font-mono" style="font-size:11px">${r.item}</td>
-      <td><strong>${p.battType || '—'}</strong></td>
-      <td>${p.tech || '—'}</td>
-      <td>${p.separator || '—'}</td>
-      <td>${p.plate || '—'}</td>
-      <td>${(r.qty||0).toLocaleString()}</td>
-    </tr>`;
-  }).join('');
-}
-
+// ── Export ─────────────────────────────────────────────────────────────
 function exportExcel() {
-  if (!lvcResults.length) { BPMS.toast('Tidak ada data untuk diekspor', 'error'); return; }
-  const state = BPMS.getState();
-  const rows  = lvcResults.map(r => {
-    const cfg  = state.capacity?.[currentPeriod]?.[r.line] || {};
-    const mins = BPMS.shiftMinutes(cfg);
-    return {
-      LINE: r.line,
-      'Total Qty': r.qty,
-      'Processing Time (Jam)': +r.processingHours.toFixed(4),
-      'Kapasitas Total (Jam)': +r.capacityHours.toFixed(2),
-      'Loading (%)': +r.loading.toFixed(2),
-      Status: r.processingHours > 0 ? r.status : 'IDLE',
-      'Shift Aktif': [cfg.s1&&'S1',cfg.s2&&'S2',cfg.s3&&'S3'].filter(Boolean).join('+'),
-      'Hari Kerja': BPMS.getWorkDayCount(currentPeriod),
-      'Menit/Hari': mins,
-    };
-  });
-  const ws = XLSX.utils.json_to_sheet(rows);
+  if (!currentYear) { BPMS.toast('Pilih tahun terlebih dahulu', 'error'); return; }
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'LVC ' + currentPeriod);
-  XLSX.writeFile(wb, `FAH_LVC_${currentPeriod}.xlsx`);
+  for (const proc of LVC_PROCESSES) {
+    const yearData = getYearData(currentYear, proc);
+    const headers  = ['Metrik', ...MONTHS_ABR];
+    const rows     = [
+      ['Loading (Jam)',        ...yearData.map(d => Math.round(d.loadingHours))],
+      ['Installed Cap. (Jam)', ...yearData.map(d => Math.round(d.installedCap))],
+      ['Setting 2OT (Jam)',    ...yearData.map(d => Math.round(d.ot2Cap))],
+      ['Setting 4OT (Jam)',    ...yearData.map(d => Math.round(d.ot4Cap))],
+      ['Hari Kerja',           ...yearData.map(d => d.workdays)],
+    ];
+    const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+    XLSX.utils.book_append_sheet(wb, ws, proc.label.substring(0, 31));
+  }
+  XLSX.writeFile(wb, `FAH_LVC_${currentYear}.xlsx`);
   BPMS.toast('Export berhasil', 'success');
 }
 </script>

@@ -261,6 +261,15 @@
     #orderFilterDropdown { max-width: 340px; max-height: 300px; }
     #orderFilterDropdown .filter-opt { white-space: nowrap; }
     #orderFilterDropdown .filter-opt span { overflow: hidden; text-overflow: ellipsis; max-width: 280px; display: block; }
+
+    /* Gen table column filter */
+    .gen-th-filter { cursor: pointer; display: inline-flex; align-items: center; gap: 3px; white-space: nowrap; }
+    .gen-filter-icon { font-size: 9px; opacity: .45; transition: opacity .15s; }
+    .gen-filter-icon.active { opacity: 1; color: var(--accent); }
+    .gen-th-filter:hover .gen-filter-icon { opacity: 1; }
+    #genFilterDropdown { max-width: 340px; max-height: 300px; }
+    #genFilterDropdown .filter-opt { white-space: nowrap; }
+    #genFilterDropdown .filter-opt span { overflow: hidden; text-overflow: ellipsis; max-width: 280px; display: block; }
   </style>
 </head>
 <body>
@@ -477,24 +486,24 @@
               <thead>
                 <tr>
                   <th class="th-orig">No</th>
-                  <th class="th-orig">Periode</th>
+                  <th class="th-orig"><span class="gen-th-filter" onclick="openGenFilter('periode',this);event.stopPropagation()">Periode<span class="gen-filter-icon" id="gfi-periode">▾</span></span></th>
                   <th class="th-orig">PN Customer</th>
                   <th class="th-orig">ITEM</th>
                   <th class="th-orig">Qty Produksi</th>
                   <th class="th-spec">Spec Code</th>
-                  <th class="th-calc">Tech</th>
-                  <th class="th-calc">Separator</th>
-                  <th class="th-calc">Battery Type</th>
-                  <th class="th-calc">Plate</th>
-                  <th class="th-calc">1st Line</th>
-                  <th class="th-calc">2nd Line</th>
+                  <th class="th-calc"><span class="gen-th-filter" onclick="openGenFilter('tech',this);event.stopPropagation()">Tech<span class="gen-filter-icon" id="gfi-tech">▾</span></span></th>
+                  <th class="th-calc"><span class="gen-th-filter" onclick="openGenFilter('separator',this);event.stopPropagation()">Separator<span class="gen-filter-icon" id="gfi-separator">▾</span></span></th>
+                  <th class="th-calc"><span class="gen-th-filter" onclick="openGenFilter('battType',this);event.stopPropagation()">Battery Type<span class="gen-filter-icon" id="gfi-battType">▾</span></span></th>
+                  <th class="th-calc"><span class="gen-th-filter" onclick="openGenFilter('plate',this);event.stopPropagation()">Plate<span class="gen-filter-icon" id="gfi-plate">▾</span></span></th>
+                  <th class="th-calc"><span class="gen-th-filter" onclick="openGenFilter('line1',this);event.stopPropagation()">1st Line<span class="gen-filter-icon" id="gfi-line1">▾</span></span></th>
+                  <th class="th-calc"><span class="gen-th-filter" onclick="openGenFilter('line2',this);event.stopPropagation()">2nd Line<span class="gen-filter-icon" id="gfi-line2">▾</span></span></th>
                   <th class="th-pos">Item Data Infor</th>
                   <th class="th-pos">PN Plate Positif</th>
-                  <th class="th-pos">Grid Process Plate Positif</th>
+                  <th class="th-pos"><span class="gen-th-filter" onclick="openGenFilter('gridPos',this);event.stopPropagation()">Grid Process Plate Positif<span class="gen-filter-icon" id="gfi-gridPos">▾</span></span></th>
                   <th class="th-pos">Qty Plate Positif</th>
                   <th class="th-pos">Qty Pule Plate Positif</th>
                   <th class="th-neg">PN Plate Negatif</th>
-                  <th class="th-neg">Grid Process Plate Negatif</th>
+                  <th class="th-neg"><span class="gen-th-filter" onclick="openGenFilter('gridNeg',this);event.stopPropagation()">Grid Process Plate Negatif<span class="gen-filter-icon" id="gfi-gridNeg">▾</span></span></th>
                   <th class="th-neg">Qty Plate Negatif</th>
                   <th class="th-neg">Qty Pule Plate Negatif</th>
                 </tr>
@@ -523,6 +532,17 @@
     <button class="btn btn-xs btn-ghost" id="orderFilterSelectAll">Semua</button>
     <button class="btn btn-xs btn-ghost" id="orderFilterClearAll">Hapus</button>
     <button class="btn btn-xs btn-primary ml-auto" id="orderFilterApply">Terapkan</button>
+  </div>
+</div>
+
+<!-- Gen Column Filter Dropdown -->
+<div id="genFilterDropdown" class="col-filter-dropdown" style="display:none">
+  <input class="filter-search" id="genFilterSearch" placeholder="Cari..."/>
+  <div class="filter-list" id="genFilterList"></div>
+  <div class="filter-actions">
+    <button class="btn btn-xs btn-ghost" id="genFilterSelectAll">Semua</button>
+    <button class="btn btn-xs btn-ghost" id="genFilterClearAll">Hapus</button>
+    <button class="btn btn-xs btn-primary ml-auto" id="genFilterApply">Terapkan</button>
   </div>
 </div>
 
@@ -649,6 +669,8 @@ let currentPeriod    = '';
 let pendingData      = [];
 let orderColFilters  = {};   // key -> Set of selected values
 let activeOrderKey   = null;
+let genColFilters    = {};   // key -> Set of selected values
+let activeGenKey     = null;
 
 function pageInit() {
   document.getElementById('topbarMount').innerHTML = BPMS.renderTopbar('Data Order');
@@ -661,6 +683,7 @@ function pageInit() {
     document.querySelectorAll('.do-panel').forEach(p => p.classList.remove('active'));
     btn.classList.add('active');
     document.getElementById('panel-' + btn.dataset.tab).classList.add('active');
+    if (btn.dataset.tab === 'data-order')   renderOrders();
     if (btn.dataset.tab === 'generated')    renderGenerated();
     if (btn.dataset.tab === 'resume-order') renderResume();
   });
@@ -676,10 +699,13 @@ function pageInit() {
     if (activeTab === 'resume-order')  renderResume();
   });
 
-  const current = BPMS.getCurrentPeriod();
-  if (BPMS.getPeriods().includes(current)) {
-    sel.value = current; currentPeriod = current;
+  const orderPeriods = Object.keys(BPMS.getState().orders || {}).sort().reverse();
+  const autoSelect   = orderPeriods[0] || '';
+  if (autoSelect) {
+    sel.value     = autoSelect;
+    currentPeriod = autoSelect;
   }
+  renderOrders();
   renderResume();
 
   // Upload modal
@@ -745,7 +771,20 @@ function pageInit() {
       opt.style.display = opt.textContent.toLowerCase().includes(q) ? '' : 'none');
   });
   document.getElementById('orderFilterDropdown').addEventListener('click', e => e.stopPropagation());
-  document.addEventListener('click', () => closeOrderFilter());
+  document.addEventListener('click', () => { closeOrderFilter(); closeGenFilter(); });
+
+  // Gen column filter wiring
+  document.getElementById('genFilterApply').addEventListener('click', () => { closeGenFilter(); renderGenerated(); });
+  document.getElementById('genFilterSelectAll').addEventListener('click', () =>
+    document.querySelectorAll('#genFilterList input[type=checkbox]').forEach(cb => cb.checked = true));
+  document.getElementById('genFilterClearAll').addEventListener('click', () =>
+    document.querySelectorAll('#genFilterList input[type=checkbox]').forEach(cb => cb.checked = false));
+  document.getElementById('genFilterSearch').addEventListener('input', e => {
+    const q = e.target.value.toLowerCase();
+    document.querySelectorAll('#genFilterList .filter-opt').forEach(opt =>
+      opt.style.display = opt.textContent.toLowerCase().includes(q) ? '' : 'none');
+  });
+  document.getElementById('genFilterDropdown').addEventListener('click', e => e.stopPropagation());
 }
 
 // ── PN Not Found Modal ────────────────────────────────────────────
@@ -1126,6 +1165,94 @@ function closeOrderFilter() {
   activeOrderKey = null;
 }
 
+// ── Gen Column Filter ─────────────────────────────────────────────
+
+function getGenCellValue(row, key, g) {
+  switch (key) {
+    case 'periode':   return BPMS.formatPeriod(row._period || '');
+    case 'tech':      return String(g.tech      || '');
+    case 'separator': return String(g.separator || '');
+    case 'battType':  return String(g.battType  || '');
+    case 'plate':     return String(g.plate     || '');
+    case 'line1':     return String(g.line1     || '');
+    case 'line2':     return String(g.line2     || '');
+    case 'gridPos':   return String(g.gridPos   || '');
+    case 'gridNeg':   return String(g.gridNeg   || '');
+    default:          return '';
+  }
+}
+
+function openGenFilter(key, triggerEl) {
+  activeGenKey = key;
+  const state = BPMS.getState();
+
+  let allOrders = [];
+  if (!currentPeriod) {
+    BPMS.getPeriods().forEach(p => {
+      (state.orders?.[p] || []).forEach(r => allOrders.push({ ...r, _period: p }));
+    });
+  } else {
+    allOrders = (state.orders?.[currentPeriod] || []).map(r => ({ ...r, _period: currentPeriod }));
+  }
+  allOrders.forEach(r => {
+    if (r._linesComputed) return;
+    const p = r._parsed || {};
+    const m = p.battType ? BPMS.findPCSMatches(p.battType, p.tech, p.plate, p.separator)[0] : null;
+    r._line1 = m?.line1 || '';
+    r._line2 = m?.line2 || '';
+    r._linesComputed = true;
+  });
+
+  const maps = buildLookupMaps();
+  const vals = [...new Set(allOrders.map(r => getGenCellValue(r, key, computeGenRow(r, maps))))].sort();
+  const sel  = genColFilters[key] || new Set(vals);
+
+  document.getElementById('genFilterSearch').value = '';
+  document.getElementById('genFilterList').innerHTML = vals.map(v =>
+    `<label class="filter-opt"><input type="checkbox" value="${v.replace(/"/g,'&quot;')}"${sel.has(v) ? ' checked' : ''}>
+     <span>${v || '(kosong)'}</span></label>`
+  ).join('');
+
+  // Update icon state
+  document.querySelectorAll('[id^="gfi-"]').forEach(el => el.classList.remove('active'));
+  const icon = document.getElementById('gfi-' + key);
+  if (icon) icon.classList.add('active');
+
+  const dropdown = document.getElementById('genFilterDropdown');
+  dropdown.style.display = 'flex';
+  const thEl = triggerEl.closest('th') || triggerEl;
+  const rect  = thEl.getBoundingClientRect();
+  const ddW   = Math.max(220, rect.width);
+  let left    = rect.left;
+  const top   = rect.bottom + 4;
+  if (left + ddW > window.innerWidth - 8) left = window.innerWidth - ddW - 8;
+  dropdown.style.left     = left + 'px';
+  dropdown.style.top      = top  + 'px';
+  dropdown.style.minWidth = ddW  + 'px';
+
+  document.getElementById('genFilterSearch').focus();
+}
+
+function closeGenFilter() {
+  if (!activeGenKey) return;
+  const checkboxes = [...document.querySelectorAll('#genFilterList input[type=checkbox]')];
+  if (checkboxes.length) {
+    const checked = new Set(checkboxes.filter(cb => cb.checked).map(cb => cb.value));
+    if (checked.size === checkboxes.length) {
+      delete genColFilters[activeGenKey];
+    } else {
+      genColFilters[activeGenKey] = checked;
+    }
+  }
+  // Update icon active state
+  document.querySelectorAll('[id^="gfi-"]').forEach(el => {
+    const k = el.id.replace('gfi-', '');
+    el.classList.toggle('active', !!genColFilters[k]);
+  });
+  document.getElementById('genFilterDropdown').style.display = 'none';
+  activeGenKey = null;
+}
+
 // ── Render Orders ────────────────────────────────────────────────
 
 function renderOrders() {
@@ -1417,9 +1544,21 @@ function renderGenerated() {
   const maps = buildLookupMaps();
   const showPeriod = !currentPeriod;
 
-  const filtered = q
+  let filtered = q
     ? allOrders.filter(r => JSON.stringify(r).toLowerCase().includes(q))
     : allOrders;
+
+  // Apply gen column filters
+  const activeGenFilters = Object.keys(genColFilters);
+  if (activeGenFilters.length) {
+    filtered = filtered.filter(r => {
+      const g = computeGenRow(r, maps);
+      return activeGenFilters.every(k => {
+        const v = getGenCellValue(r, k, g);
+        return genColFilters[k].has(v);
+      });
+    });
+  }
 
   document.getElementById('genCount').textContent = `${filtered.length} / ${allOrders.length} item`;
 
@@ -1572,6 +1711,25 @@ function renderResume() {
       </tr>`;
     }
   });
+
+  // Grand Total row
+  const allCusts = resumeGroups.flatMap(g => g.customers);
+  const gtD       = allCusts.reduce((s, c) => s + c.d,       0);
+  const gtU       = allCusts.reduce((s, c) => s + c.u,       0);
+  const gtW       = allCusts.reduce((s, c) => s + c.w,       0);
+  const gtLithium = allCusts.reduce((s, c) => s + c.lithium, 0);
+  const gtTotal   = gtD + gtU + gtW + gtLithium;
+  const gtMB      = resumeGroups.reduce((s, g) => s + g.mb,  0);
+  html += `<tr style="background:#1e3a5f">
+    <td colspan="3" style="padding:7px 12px;font-weight:700;font-size:11px;color:#fff;letter-spacing:.04em">GRAND TOTAL</td>
+    <td class="rt-num" style="color:#fff;font-weight:700"><strong>${fmt(gtD)}</strong></td>
+    <td class="rt-num" style="color:#fff;font-weight:700"><strong>${fmt(gtU)}</strong></td>
+    <td class="rt-num" style="color:#fff;font-weight:700"><strong>${fmt(gtW)}</strong></td>
+    <td class="rt-num" style="color:#fff;font-weight:700"><strong>${fmt(gtLithium)}</strong></td>
+    <td class="rt-num" style="color:#fff;font-weight:700"><strong>${fmt(gtTotal)}</strong></td>
+    <td class="rt-num" style="color:#fff;font-weight:700"><strong>${fmt(gtMB)}</strong></td>
+    <td class="rt-num" style="color:#fff">${dot(gtTotal, gtMB)}</td>
+  </tr>`;
 
   body.innerHTML = html;
 }

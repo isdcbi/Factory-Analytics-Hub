@@ -1,7 +1,7 @@
 # Factory Analytics Hub (FAH) — Current State & Activity Log
 
 **Project:** Factory Analytics Hub (FAH) v1.0  
-**Last Updated:** 2026-04-28 15:00  
+**Last Updated:** 2026-05-05 (session 2)  
 **Stack:** HTML5 + Vanilla JS + PHP (state.php) + SheetJS
 
 ---
@@ -15,6 +15,7 @@
 | Entry Point (redirect) | `index.html` | ✅ Redirect → home.html |
 | Database PCS | `database-pcs.html` | ✅ Selesai |
 | Data Order | `data-order.html` | ✅ Selesai |
+| LVC Analysis | `lvc-analysis.html` | ✅ Selesai (redesign v2 — process cards + year view) |
 | Setting Kapasitas | `setting-capacity.html` | ✅ Selesai |
 | Man Power | `man-power.html` | ✅ Selesai (redesign) |
 | Database Konversi | `database-konversi.html` | 🔲 Placeholder |
@@ -25,6 +26,27 @@
 ---
 
 ## Activity Log
+
+### 2026-05-05
+- **lvc-analysis.html** — Card Formation: ganti label loading menjadi "Loading (panel)", unit "panel". Logic: sum (Qty Plate Positif + Qty Plate Negatif) × Qty Produksi dari semua order di bulan tersebut yang Spec Code = 'D'. Tambah helper `buildPlateMap()` (baca `dbPlateInfor` dari state, lookup by "Item Data Infor" key). Config proc: `loadQtyFrom: 'formationPanel'`, `qtyOnly: true`, `loadLabelText`, `loadUnitText`. `renderProcessCard` diupdate: `useQty` juga true bila `proc.loadQtyFrom` ada; gunakan `proc.loadLabelText`/`loadUnitText` jika di-set.
+- **data-order.html** — Fix tab "Data Order" tidak menampilkan data: tambah `renderOrders()` di handler klik tab `data-order`, dan panggil `renderOrders()` di `pageInit()` bersama `renderResume()` agar stat cards terisi saat halaman dibuka.
+- **data-order.html** — Auto-load periode terbaru saat halaman dibuka: `pageInit()` cari period dengan data terbaru dari `orders`, set ke `sel.value` dan `currentPeriod`, lalu render semua panel.
+- **data-order.html** — Tambah filter kolom pada header tabel Generated Data Order (pola sama dengan filter Database PCS). Kolom yang bisa difilter: Periode, Tech, Separator, Battery Type, Plate, 1st Line, 2nd Line, Grid Process Plate Positif, Grid Process Plate Negatif. State terpisah: `genColFilters` + `activeGenKey`. Fungsi baru: `getGenCellValue`, `openGenFilter`, `closeGenFilter`.
+
+### 2026-05-03
+- **PRD.md** — Nama project diubah dari "Battery Production Management System (BPMS)" menjadi "Factory Analytics Hub (FAH)" di header dan overview.
+- **shared-components.js** — Tambah `resumeMB: {}` ke DEFAULT_STATE untuk menyimpan nilai MB per periode per grup di Resume Order.
+- **data-order.html** — Kolom "Type" diubah nama menjadi "Dry DUC Wet"; parsing data diambil dari header Excel dengan fallback ke kolom J (index 9) jika header tidak ditemukan.
+- **data-order.html** — Tambah tab "Resume Order" sebagai tab paling kiri (default). Tab sekarang: Resume Order | Data Order | Generated Data Order.
+- **data-order.html** — Implementasi tabel Resume Order: grouping Customer (dari Sold To) ke 8 grup (AOP International, AOP Domestic, Bina Pertiwi, ADM, Others, MCB Domestic, e-Bike, Lithium) via regex `RESUME_GROUP_DEF`. Kolom: No, Group, Customer, D, U, W, Lithium, Total Qty, MB (editable), % (inline update).
+- **data-order.html** — SUMIF per kolom Dry DUC Wet (D/U/W), kolom Lithium mengambil nilai 'P'. Subtotal per kategori (Total AMB, Total MCB, Total e-Bike, Total Lithium) + Grand Total baris paling bawah.
+- **data-order.html** — MB input: manual per-periode, disimpan ke `state.resumeMB[period][group]`. Kolom % update inline tanpa re-render.
+- **data-order.html** — Customer uncategorized yang punya qty Lithium > 0 otomatis masuk grup Lithium.
+- **data-order.html** — Stat cards: hanya card "Unmapped" dan "PN NOT FOUND" yang bisa diklik (popup). Card "PN NOT FOUND" menghitung ITEM dengan panjang < 27 digit.
+- **data-order.html** — `<colgroup>` untuk lebar kolom tabel Resume Order (konsisten dengan rowspan). Kolom D/U/W/Lithium dibuat sama lebar (92px).
+- **lvc-analysis.html** — **Redesign lengkap**: ganti chart single-period menjadi 8 kartu proses tahun (year view). Urutan proses: Charging → Assembling → Formation → Pasting Punching → Pasting Casting → Ball Mill → Grid Punching → Grid Casting.
+- **lvc-analysis.html** — Tiap kartu: sidebar stat (Σ LOAD, Σ CAP, AVG UTIL) + SVG bar+line chart 12 bulan + tabel data (5 baris × 12 kolom). Bar berwarna berdasarkan utilisasi (hijau <85%, oranye 85-100%, merah 100-120%, merah tua >120%). 3 garis kapasitas: Installed (solid hitam), 2OT (dash biru), 4OT (dot navy).
+- **lvc-analysis.html** — Year selector menggantikan period selector. Export Excel per-proses ke sheet terpisah.
 
 ### 2026-04-28
 - **Rebranding** — Nama portal diubah dari BPMS menjadi **Factory Analytics Hub** (FAH). Semua `<title>`, sidebar branding, prefix file export (`BPMS_` → `FAH_`), logo sidebar diganti PNG `Logo FAH.png`. Object JS `BPMS` tidak diubah.
@@ -104,6 +126,6 @@
 
 ## Known Issues / TODO
 
-- [ ] Halaman LVC: belum diverifikasi ulang setelah update `formatPeriod` ke nama Indonesia
+- [x] Halaman LVC: redesign selesai — year-based process cards dengan SVG chart
 - [ ] Export Excel semua halaman: belum ditest setelah refactor tabel
 - [ ] `setting-capacity.html` & `man-power.html`: dropdown periode masih pakai format lama (ada kode YYYY-MM) — perlu diseragamkan
