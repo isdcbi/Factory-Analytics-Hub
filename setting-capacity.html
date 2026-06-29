@@ -9,6 +9,7 @@
     .cal-day { min-width: 36px; min-height: 36px; font-size: 12px; cursor: pointer; }
     .cal-day.today { border: 1px solid var(--accent-v); }
     .cal-day[title]:hover::after { content: attr(title); position: absolute; bottom: 110%; left: 50%; transform: translateX(-50%); background: var(--bg-2); border: 1px solid var(--border); border-radius: 4px; padding: 3px 8px; font-size: 10px; white-space: nowrap; z-index: 10; pointer-events: none; }
+    .cal-day.work-replace { background: rgba(22,163,74,0.18); border: 1px solid rgba(22,163,74,0.5); color: #15803d; font-weight: 600; }
     .summary-chip { display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 6px; background: var(--bg-2); border: 1px solid var(--border-solid2); font-size: 12px; color: var(--text-2); }
     .summary-chip strong { color: var(--text-1); }
 
@@ -39,6 +40,41 @@
     .sc-panel { display: none; }
     .sc-panel.active { display: block; }
 
+    /* ── Kalender Kerja v2 ──────────────────────────────────────── */
+    .cal2-inner { display: flex; gap: 16px; align-items: stretch; }
+    .cal2-grid-col { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+    .cal2-info-col { flex: 1; min-width: 0; overflow-y: auto; }
+
+    .cal2-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+    .cal2-nav { display: flex; align-items: center; gap: 4px; }
+    .cal2-month { font-size: 13px; font-weight: 700; color: var(--text-1); min-width: 100px; text-align: center; }
+    .cal2-daycount { display: inline-flex; align-items: center; padding: 3px 10px; border-radius: 99px; font-size: 11px; font-weight: 700; background: #dcfce7; color: #15803d; border: 1px solid #bbf7d0; }
+
+    .cal2-legend { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 10px; }
+    .cal2-chip { display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px; border-radius: 99px; font-size: 10px; font-weight: 600; border: 1px solid transparent; }
+    .cal2-chip-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+
+    .cal2-grid { display: grid; grid-template-columns: repeat(7, 52px); gap: 3px; }
+    .cal2-hdr { text-align: center; font-size: 10px; font-weight: 700; color: var(--text-4); padding: 4px 0; }
+    .cal2-day { position: relative; display: flex; align-items: center; justify-content: center; aspect-ratio: 1 / 1; border-radius: 6px; font-size: 12px; font-weight: 500; cursor: pointer; border: 1.5px solid transparent; transition: opacity .12s; user-select: none; }
+    .cal2-day:hover:not(.empty) { opacity: .7; }
+    .cal2-day.on  { background: rgba(22,163,74,.12); border-color: rgba(22,163,74,.45); color: #15803d; font-weight: 600; }
+    .cal2-day.off { background: #f8f9fa; border-color: #e2e5e9; color: var(--text-4); }
+    .cal2-day.today         { box-shadow: inset 0 0 0 2px var(--accent) !important; }
+    .cal2-day.empty         { background: none; border: none; cursor: default; }
+    .cal2-dot { position: absolute; top: 3px; right: 4px; width: 5px; height: 5px; border-radius: 50%; }
+
+    .cal2-actions { display: flex; gap: 6px; margin-top: 10px; }
+
+    .cal2-info-title { font-size: 11px; font-weight: 700; color: var(--text-2); margin-bottom: 8px; padding-bottom: 6px; border-bottom: 1px solid var(--border-solid2); }
+    .cal2-info-item { display: flex; align-items: flex-start; gap: 6px; padding: 5px 0; border-bottom: 1px solid var(--border); }
+    .cal2-info-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; margin-top: 2px; }
+    .cal2-info-text { flex: 1; font-size: 10.5px; color: var(--text-2); line-height: 1.45; }
+    .cal2-info-badge { font-size: 9px; font-weight: 700; padding: 2px 6px; border-radius: 3px; flex-shrink: 0; margin-top: 1px; }
+    .cal2-badge-on  { background: #dcfce7; color: #15803d; }
+    .cal2-badge-off { background: #fee2e2; color: #dc2626; }
+    .cal2-empty-info { font-size: 11px; color: var(--text-4); text-align: center; padding: 20px 0; }
+
     /* ── Process Capacity Table ─────────────────────────────────── */
     .pc-std-table { width: 100%; font-size: 13px; }
     .pc-std-table th { text-align: left; font-weight: 600; padding: 6px 12px; background: var(--bg-2); font-size: 11px; }
@@ -53,12 +89,16 @@
     .pc-table td { padding: 5px 6px; border-bottom: 1px solid var(--border); text-align: center; }
     .pc-table td:nth-child(2), .pc-table td:nth-child(3) { text-align: left; }
     .pc-table td.pc-calc { background: #f0fdf4; color: #15803d; font-weight: 600; }
+    .pc-table td.pc-input { background: #eff6ff; }
     .pc-table input[type=text], .pc-table input[type=number] {
       width: 100%; border: 1px solid transparent; background: transparent; padding: 3px 6px;
       border-radius: 4px; font-size: 12px; text-align: inherit;
     }
     .pc-table input[type=number] { text-align: right; }
     .pc-table input:focus { outline: none; border-color: var(--accent); background: #fff; }
+    .pc-table td.pc-input input[type=text],
+    .pc-table td.pc-input input[type=number] { border-color: #bfdbfe; background: #fff; }
+    .pc-table td.pc-input input:focus { border-color: var(--accent) !important; }
     .pc-table .btn-del { background: none; border: none; color: var(--text-4); cursor: pointer; padding: 2px 6px; border-radius: 4px; font-size: 14px; }
     .pc-table .btn-del:hover { color: #dc2626; background: #fff1f1; }
   </style>
@@ -77,10 +117,12 @@
           <select id="periodSelect" class="form-control" style="width:auto">
             <option value="">— Pilih Periode —</option>
           </select>
-          <input type="month" id="newPeriodInput" class="form-control" style="width:170px"/>
-          <button class="btn btn-ghost btn-sm" id="addPeriodBtn">+ Tambah</button>
+          <button class="btn btn-ghost btn-sm" id="addPeriodBtn">+ Tambah Periode</button>
         </div>
-        <button class="btn btn-primary btn-sm ml-auto" id="saveBtn">Simpan Pengaturan</button>
+        <div class="ml-auto flex gap-2">
+          <button class="btn btn-ghost btn-sm" onclick="resetAllCalendars()">↺ Reset Semua Periode</button>
+          <button class="btn btn-primary btn-sm" id="saveBtn">Simpan Pengaturan</button>
+        </div>
       </div>
 
       <!-- Tab Navigation -->
@@ -95,27 +137,47 @@
           <!-- Summary chips -->
           <div id="summaryChips" class="flex gap-3 mb-6 flex-wrap"></div>
 
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px">
+          <div style="display:grid;grid-template-columns:3fr 2fr;gap:24px">
 
             <!-- Calendar -->
             <div class="card">
-              <div class="card-header" style="margin-bottom:12px">
-                <span class="card-title">Kalender Kerja</span>
-                <div class="flex gap-2">
-                  <button class="btn btn-ghost btn-xs" id="prevMonth">‹</button>
-                  <span id="calTitle" style="font-size:13px;color:var(--text-2);min-width:100px;text-align:center"></span>
-                  <button class="btn btn-ghost btn-xs" id="nextMonth">›</button>
+              <!-- Header -->
+              <div class="cal2-header">
+                <span class="card-title" style="margin:0">Kalender Kerja</span>
+                <div style="display:flex;align-items:center;gap:8px">
+                  <div class="cal2-nav">
+                    <button class="btn btn-ghost btn-xs" id="prevMonth">‹</button>
+                    <span id="calTitle" class="cal2-month"></span>
+                    <button class="btn btn-ghost btn-xs" id="nextMonth">›</button>
+                  </div>
+                  <span id="calDayCount" class="cal2-daycount">Hari ON: —</span>
                 </div>
               </div>
-              <div class="flex gap-3 mb-3 text-sm" style="font-size:11px;color:var(--text-4)">
-                <span style="display:flex;align-items:center;gap:4px"><span style="width:10px;height:10px;border-radius:2px;background:rgba(39,166,68,0.2);border:1px solid rgba(39,166,68,0.4);display:inline-block"></span> ON</span>
-                <span style="display:flex;align-items:center;gap:4px"><span style="width:10px;height:10px;border-radius:2px;background:var(--bg-2);border:1px solid var(--border-solid2);display:inline-block"></span> OFF</span>
-                <span style="display:flex;align-items:center;gap:4px"><span style="width:10px;height:10px;border-radius:2px;background:rgba(224,52,52,0.1);display:inline-block"></span> Libur</span>
+
+              <!-- Legend -->
+              <div class="cal2-legend">
+                <span class="cal2-chip" style="background:rgba(22,163,74,.1);border-color:rgba(22,163,74,.3);color:#15803d"><span class="cal2-chip-dot" style="background:#22c55e"></span>Status ON</span>
+                <span class="cal2-chip" style="background:var(--bg-2);border-color:var(--border-solid2);color:var(--text-4)"><span class="cal2-chip-dot" style="background:var(--border-solid2)"></span>Status OFF</span>
+                <span class="cal2-chip" style="background:rgba(239,68,68,.07);border-color:rgba(239,68,68,.25);color:#b91c1c"><span class="cal2-chip-dot" style="background:#ef4444"></span>Libur Nasional (OFF)</span>
+                <span class="cal2-chip" style="background:rgba(234,179,8,.1);border-color:rgba(234,179,8,.4);color:#92400e"><span class="cal2-chip-dot" style="background:#f59e0b"></span>Cuti Bersama (OFF)</span>
+                <span class="cal2-chip" style="background:rgba(249,115,22,.08);border-color:rgba(249,115,22,.3);color:#c2410c"><span class="cal2-chip-dot" style="background:#f97316"></span>Libur Penggantian (OFF)</span>
+                <span class="cal2-chip" style="background:rgba(22,163,74,.18);border-color:rgba(22,163,74,.5);color:#166534"><span class="cal2-chip-dot" style="background:#16a34a"></span>Hari Kerja Pengganti (ON)</span>
               </div>
-              <div id="calendarGrid" class="calendar-grid"></div>
-              <div class="flex gap-2 mt-3">
-                <button class="btn btn-ghost btn-xs" onclick="setAllWeekdays(true)">Aktifkan Weekday</button>
-                <button class="btn btn-ghost btn-xs" onclick="setAllWeekdays(false)">Nonaktifkan Semua</button>
+
+              <!-- Inner: grid + keterangan -->
+              <div class="cal2-inner">
+                <div class="cal2-grid-col">
+                  <div id="calendarGrid" class="cal2-grid"></div>
+                  <div class="cal2-actions">
+                    <button class="btn btn-ghost btn-xs" onclick="setAllWeekdays(true)">Aktifkan Weekday</button>
+                    <button class="btn btn-ghost btn-xs" onclick="setAllWeekdays(false)">Nonaktifkan Semua</button>
+                    <button class="btn btn-ghost btn-xs" onclick="resetCalendar()" style="margin-left:auto;color:var(--accent)">↺ Reset ke Default</button>
+                  </div>
+                </div>
+                <div class="cal2-info-col">
+                  <div class="cal2-info-title">Keterangan Periode</div>
+                  <div id="calKeterangan"></div>
+                </div>
               </div>
             </div>
 
@@ -191,7 +253,13 @@
         <div class="card">
           <div class="card-header">
             <span class="card-title">Process Capacity</span>
-            <button class="btn btn-ghost btn-sm" onclick="addPCRow()">+ Tambah Baris</button>
+            <div style="display:flex;align-items:center;gap:16px">
+              <div style="display:flex;align-items:center;gap:10px;font-size:11px;color:var(--text-3)">
+                <span style="display:inline-flex;align-items:center;gap:5px"><span style="width:11px;height:11px;border-radius:2px;background:#eff6ff;border:1px solid #bfdbfe;display:inline-block"></span>Input Manual</span>
+                <span style="display:inline-flex;align-items:center;gap:5px"><span style="width:11px;height:11px;border-radius:2px;background:#e9ebf8;border:1px solid #c7d2fe;display:inline-block"></span>Auto Kalkulasi</span>
+              </div>
+              <button class="btn btn-ghost btn-sm" onclick="addPCRow()">+ Tambah Baris</button>
+            </div>
           </div>
           <div class="table-wrap">
             <div class="table-scroll">
@@ -199,22 +267,24 @@
                 <thead>
                   <tr>
                     <th rowspan="2" style="width:32px">#</th>
-                    <th rowspan="2">Process</th>
-                    <th rowspan="2">Unit</th>
-                    <th rowspan="2">Speed</th>
-                    <th rowspan="2">Efficiency (%)</th>
-                    <th colspan="3" style="text-align:center;background:#e9ebf8">Kapasitas/Shift</th>
-                    <th colspan="3" style="text-align:center;background:#e6f4ec">Qty Machine</th>
+                    <th rowspan="2" style="background:#dbeafe;color:#1d4ed8">Process</th>
+                    <th rowspan="2" style="background:#dbeafe;color:#1d4ed8">Unit</th>
+                    <th rowspan="2" style="background:#dbeafe;color:#1d4ed8">Speed</th>
+                    <th rowspan="2" style="background:#dbeafe;color:#1d4ed8">Efficiency (%)</th>
+                    <th colspan="3" style="text-align:center;background:#e9ebf8;color:#4338ca">Kapasitas/Shift</th>
+                    <th rowspan="2" style="background:#dbeafe;color:#1d4ed8">Installed Machine (unit)</th>
+                    <th rowspan="2" style="background:#dcfce7;color:#15803d">Installed Capacity</th>
+                    <th colspan="3" style="text-align:center;background:#dbeafe;color:#1d4ed8">Qty Machine</th>
                     <th rowspan="2" style="background:#fef9c3;color:#854d0e">Capacity/day</th>
                     <th rowspan="2" style="width:40px"></th>
                   </tr>
                   <tr>
-                    <th style="background:#e9ebf8">Shift 1</th>
-                    <th style="background:#e9ebf8">Shift 2</th>
-                    <th style="background:#e9ebf8">Shift 3</th>
-                    <th style="background:#e6f4ec">Shift 1</th>
-                    <th style="background:#e6f4ec">Shift 2</th>
-                    <th style="background:#e6f4ec">Shift 3</th>
+                    <th style="background:#e9ebf8;color:#4338ca">Shift 1</th>
+                    <th style="background:#e9ebf8;color:#4338ca">Shift 2</th>
+                    <th style="background:#e9ebf8;color:#4338ca">Shift 3</th>
+                    <th style="background:#dbeafe;color:#1d4ed8">Shift 1</th>
+                    <th style="background:#dbeafe;color:#1d4ed8">Shift 2</th>
+                    <th style="background:#dbeafe;color:#1d4ed8">Shift 3</th>
                   </tr>
                 </thead>
                 <tbody id="pcBody"></tbody>
@@ -225,6 +295,52 @@
 
       </div>
 
+    </div>
+  </div>
+</div>
+
+<!-- ── Modal: Tambah Periode ────────────────────────────────────────── -->
+<div id="addPeriodModal" style="display:none;position:fixed;inset:0;z-index:100;background:rgba(0,0,0,0.35);align-items:center;justify-content:center">
+  <div style="background:var(--bg-1);border:1px solid var(--border-solid2);border-radius:12px;padding:28px;width:360px;max-width:95vw;box-shadow:0 8px 32px rgba(0,0,0,0.15)">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+      <div>
+        <div style="font-size:15px;font-weight:600;color:var(--text-1)">Tambah Periode</div>
+        <div class="text-muted text-sm" style="margin-top:2px">Pilih bulan dan tahun yang ingin ditambahkan</div>
+      </div>
+      <button class="btn btn-ghost btn-xs" id="closeAddPeriodModal">✕</button>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px">
+      <div>
+        <label class="form-label">Bulan</label>
+        <select id="modalMonth" class="form-control" style="width:100%">
+          <option value="01">Januari</option>
+          <option value="02">Februari</option>
+          <option value="03">Maret</option>
+          <option value="04">April</option>
+          <option value="05">Mei</option>
+          <option value="06">Juni</option>
+          <option value="07">Juli</option>
+          <option value="08">Agustus</option>
+          <option value="09">September</option>
+          <option value="10">Oktober</option>
+          <option value="11">November</option>
+          <option value="12">Desember</option>
+        </select>
+      </div>
+      <div>
+        <label class="form-label">Tahun</label>
+        <div style="display:flex;align-items:center;gap:0">
+          <input id="modalYear" class="form-control" style="text-align:center;font-weight:600;border-radius:6px 0 0 6px;border-right:none" type="number" min="2020" max="2099" step="1"/>
+          <div style="display:flex;flex-direction:column;border:1px solid var(--border-solid2);border-radius:0 6px 6px 0;overflow:hidden">
+            <button id="modalYearUp"   style="padding:3px 8px;background:var(--bg-2);border:none;border-bottom:1px solid var(--border-solid2);cursor:pointer;font-size:9px;color:var(--text-3);line-height:1" onmouseover="this.style.background='var(--bg-3)'" onmouseout="this.style.background='var(--bg-2)'">▲</button>
+            <button id="modalYearDown" style="padding:3px 8px;background:var(--bg-2);border:none;cursor:pointer;font-size:9px;color:var(--text-3);line-height:1" onmouseover="this.style.background='var(--bg-3)'" onmouseout="this.style.background='var(--bg-2)'">▼</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end">
+      <button class="btn btn-ghost btn-sm" id="cancelAddPeriodModal">Batal</button>
+      <button class="btn btn-primary btn-sm" id="confirmAddPeriod">Tambah</button>
     </div>
   </div>
 </div>
@@ -263,10 +379,29 @@ function pageInit() {
   const sel = document.getElementById('periodSelect');
   sel.addEventListener('change', () => { currentPeriod = sel.value; loadPeriod(); });
 
-  document.getElementById('addPeriodBtn').addEventListener('click', addPeriod);
   document.getElementById('saveBtn').addEventListener('click', savePeriod);
   document.getElementById('prevMonth').addEventListener('click', () => { if (calMonth === 1) { calMonth = 12; calYear--; } else calMonth--; renderCalendar(); });
   document.getElementById('nextMonth').addEventListener('click', () => { if (calMonth === 12) { calMonth = 1; calYear++; } else calMonth++; renderCalendar(); });
+
+  // Modal tambah periode
+  const modal     = document.getElementById('addPeriodModal');
+  const modalYear = document.getElementById('modalYear');
+  const now       = new Date();
+  modalYear.value = now.getFullYear();
+  document.getElementById('modalMonth').value = String(now.getMonth() + 1).padStart(2, '0');
+
+  document.getElementById('addPeriodBtn').addEventListener('click', () => { modal.style.display = 'flex'; });
+  document.getElementById('closeAddPeriodModal').addEventListener('click',  () => { modal.style.display = 'none'; });
+  document.getElementById('cancelAddPeriodModal').addEventListener('click', () => { modal.style.display = 'none'; });
+  modal.addEventListener('click', e => { if (e.target === modal) modal.style.display = 'none'; });
+  document.getElementById('modalYearUp').addEventListener('click',   () => { modalYear.value = Number(modalYear.value) + 1; });
+  document.getElementById('modalYearDown').addEventListener('click', () => { modalYear.value = Number(modalYear.value) - 1; });
+  document.getElementById('confirmAddPeriod').addEventListener('click', () => {
+    const m = document.getElementById('modalMonth').value;
+    const y = String(modalYear.value).padStart(4, '0');
+    modal.style.display = 'none';
+    addPeriod(`${y}-${m}`);
+  });
 
   const current = BPMS.getCurrentPeriod();
   if (BPMS.getPeriods().includes(current)) { sel.value = current; currentPeriod = current; loadPeriod(); }
@@ -274,6 +409,12 @@ function pageInit() {
   syncProcessCapacity();
   renderPCTable();
   loadSummary();
+
+  document.getElementById('pcTable').addEventListener('focusout', e => {
+    if (!document.getElementById('pcTable').contains(e.relatedTarget)) {
+      BPMS.saveState();
+    }
+  });
 }
 
 function populatePeriods() {
@@ -283,15 +424,14 @@ function populatePeriods() {
   BPMS.getPeriods().forEach(p => {
     const opt = document.createElement('option');
     opt.value       = p;
-    opt.textContent = BPMS.formatPeriod(p) + ' (' + p + ')';
+    opt.textContent = BPMS.formatPeriod(p);
     sel.appendChild(opt);
   });
   if (prev) sel.value = prev;
 }
 
-function addPeriod() {
-  const val = document.getElementById('newPeriodInput').value;
-  if (!val) { BPMS.toast('Pilih bulan terlebih dahulu', 'error'); return; }
+function addPeriod(val) {
+  if (!val) { BPMS.toast('Pilih periode terlebih dahulu', 'error'); return; }
   const state = BPMS.getState();
   if (!state.orders[val])       state.orders[val] = [];
   BPMS.initCalendarForPeriod(val);
@@ -323,6 +463,7 @@ function loadPeriod() {
   renderShiftTable();
   updateSummaryChips();
   loadSummary();
+  renderPCTable();
 }
 
 // ── Calendar ──────────────────────────────────────────────────────
@@ -334,34 +475,86 @@ function renderCalendar() {
   const firstDow = new Date(calYear, calMonth - 1, 1).getDay();
   const start    = (firstDow + 6) % 7;
 
-  const months = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
-  document.getElementById('calTitle').textContent = months[calMonth - 1] + ' ' + calYear;
-
-  let html = '';
-  ['Sen','Sel','Rab','Kam','Jum','Sab','Min'].forEach(d => { html += `<div class="cal-day-header">${d}</div>`; });
-  for (let i = 0; i < start; i++) html += '<div class="cal-day empty"></div>';
+  const MONTHS = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+  document.getElementById('calTitle').textContent = MONTHS[calMonth - 1] + ' ' + calYear;
 
   const today  = new Date();
   const todayS = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
 
+  // Day-type classification helpers
+  const isCuti      = name => name && name.startsWith('Cuti Bersama');
+  const isLiburGanti= name => name && name.startsWith('Libur dengan Penggantian');
+
+  let gridHtml = '';
+  ['Sen','Sel','Rab','Kam','Jum','Sab','Min'].forEach(d => { gridHtml += `<div class="cal2-hdr">${d}</div>`; });
+  for (let i = 0; i < start; i++) gridHtml += '<div class="cal2-day empty"></div>';
+
+  const kItems = [];
+
   for (let d = 1; d <= daysInM; d++) {
-    const ds  = `${calYear}-${String(calMonth).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-    const dow = new Date(calYear, calMonth - 1, d).getDay();
-    const holiday = HOLIDAYS[ds];
-    const isOn    = cal[ds] === true;
+    const ds         = `${calYear}-${String(calMonth).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const holiday    = HOLIDAYS[ds];
+    const isWorkRepl = BPMS.WORKING_DAYS_2026.has(ds);
+    const isOn       = cal[ds] === true;
 
-    let cls = 'cal-day';
-    let title = '';
-    if (holiday)       { cls += ' holiday'; title = holiday; }
-    else if (isOn)       cls += ' work-on';
-    else                 cls += ' work-off';
-    if (ds === todayS)   cls += ' today';
+    let cls = 'cal2-day', dotColor = '', dotLabel = '';
 
-    html += `<div class="${cls}" data-date="${ds}" onclick="toggleDay('${ds}')" ${title ? `title="${title}"` : ''}>${d}</div>`;
+    if (holiday) {
+      if (isCuti(holiday))            dotColor = '#f59e0b';
+      else if (isLiburGanti(holiday)) dotColor = '#f97316';
+      else                            dotColor = '#ef4444';
+      dotLabel = holiday;
+    } else if (isWorkRepl) {
+      dotColor = '#22c55e'; dotLabel = 'Hari Kerja Pengganti';
+    }
+    cls += isOn ? ' on' : ' off';
+    if (ds === todayS) cls += ' today';
+
+    const dot      = dotColor ? `<span class="cal2-dot" style="background:${dotColor}"></span>` : '';
+    const leftBar  = dotColor ? `border-left:3px solid ${dotColor};` : '';
+    gridHtml += `<div class="${cls}" style="${leftBar}" onclick="toggleDay('${ds}')">${d}${dot}</div>`;
+
+    if (dotLabel) kItems.push({ d, label: dotLabel, dotColor, isOn });
   }
 
-  document.getElementById('calendarGrid').innerHTML = html;
+  document.getElementById('calendarGrid').innerHTML = gridHtml;
+
+  // Keterangan panel
+  const onCount = Object.values(cal).filter(v => v === true).length;
+  document.getElementById('calDayCount').textContent = 'Hari ON: ' + onCount;
+
+  let kHtml = kItems.length
+    ? kItems.map(it => `
+        <div class="cal2-info-item">
+          <span class="cal2-info-dot" style="background:${it.dotColor}"></span>
+          <span class="cal2-info-text">${it.d} ${MONTHS[calMonth-1]}: ${it.label}</span>
+          <span class="cal2-info-badge ${it.isOn ? 'cal2-badge-on' : 'cal2-badge-off'}">${it.isOn ? 'ON' : 'OFF'}</span>
+        </div>`).join('')
+    : '<div class="cal2-empty-info">Tidak ada hari istimewa</div>';
+  document.getElementById('calKeterangan').innerHTML = kHtml;
+
   updateSummaryChips();
+}
+
+function resetCalendar() {
+  if (!currentPeriod) return;
+  const state = BPMS.getState();
+  delete state.workCalendar[currentPeriod];
+  BPMS.initCalendarForPeriod(currentPeriod);
+  renderCalendar();
+}
+
+function resetAllCalendars() {
+  const state   = BPMS.getState();
+  const periods = Object.keys(state.workCalendar || {});
+  if (!periods.length) { BPMS.toast('Tidak ada periode yang perlu di-reset', 'info'); return; }
+  periods.forEach(p => {
+    delete state.workCalendar[p];
+    BPMS.initCalendarForPeriod(p);
+  });
+  BPMS.saveState();
+  if (currentPeriod) renderCalendar();
+  BPMS.toast(`${periods.length} periode berhasil di-reset ke kalender kerja 2026`, 'success');
 }
 
 function toggleDay(ds) {
@@ -430,6 +623,7 @@ function updateShift(line, shift, val) {
   const lbl = document.getElementById(`lbl-${key}-${shift}`);
   if (lbl) { lbl.textContent = val ? 'ON' : 'OFF'; lbl.style.color = val ? 'var(--accent)' : 'var(--text-4)'; }
   updateSummaryChips();
+  renderPCTable();
 }
 
 function updateSummaryChips() {
@@ -626,14 +820,15 @@ function syncProcessCapacity() {
 
   // Migrate qty fields for existing rows
   existingMap.forEach(r => {
-    if (r.qtyS1 === undefined) r.qtyS1 = '';
-    if (r.qtyS2 === undefined) r.qtyS2 = '';
-    if (r.qtyS3 === undefined) r.qtyS3 = '';
+    if (r.qtyS1             === undefined) r.qtyS1             = '';
+    if (r.qtyS2             === undefined) r.qtyS2             = '';
+    if (r.qtyS3             === undefined) r.qtyS3             = '';
+    if (r.installedMachine  === undefined) r.installedMachine  = '';
   });
 
   // Rebuild in ALL_LINES order, preserving existing data
   const synced = ALL_LINES.map(line =>
-    existingMap.get(line) || { process: line, unit: '', speed: '', efficiency: '', qtyS1: '', qtyS2: '', qtyS3: '' }
+    existingMap.get(line) || { process: line, unit: '', speed: '', efficiency: '', installedMachine: '', qtyS1: '', qtyS2: '', qtyS3: '' }
   );
 
   // Append custom rows not in ALL_LINES (user-added)
@@ -650,35 +845,57 @@ function renderPCTable() {
   const rows = BPMS.getState().processCapacity || [];
   const body = document.getElementById('pcBody');
   if (!rows.length) {
-    body.innerHTML = `<tr><td colspan="13" class="text-center text-muted" style="padding:28px">Belum ada data — klik "+ Tambah Baris"</td></tr>`;
+    body.innerHTML = `<tr><td colspan="15" class="text-center text-muted" style="padding:28px">Belum ada data — klik "+ Tambah Baris"</td></tr>`;
     return;
   }
   body.innerHTML = rows.map((r, i) => renderPCRow(r, i)).join('');
 }
 
 function renderPCRow(r, i) {
-  const capShift = (speed, eff, mins) => (Number(speed) || 0) * ((Number(eff) || 0) / 100) * mins;
-  const fmt      = v => v > 0 ? Math.round(v).toLocaleString('id-ID') : '—';
+  const capShift    = (speed, eff, mins) => (Number(speed) || 0) * ((Number(eff) || 0) / 100) * mins;
+  const fmt         = v => v > 0 ? Math.round(v).toLocaleString('id-ID') : '—';
+  const isFormation = r.process === 'Formation';
+
+  // Shift ON/OFF dari konfigurasi periode aktif
+  const shiftCfg = currentPeriod
+    ? (BPMS.getState().capacity?.[currentPeriod]?.[r.process] || null)
+    : null;
+  const shiftOn = s => {
+    if (isFormation && s !== 's1') return false;
+    return shiftCfg ? !!shiftCfg[s] : true;
+  };
+  const s1On = shiftOn('s1'), s2On = shiftOn('s2'), s3On = shiftOn('s3');
 
   const c1 = capShift(r.speed, r.efficiency, SHIFT_MINS.s1);
-  const c2 = capShift(r.speed, r.efficiency, SHIFT_MINS.s2);
-  const c3 = capShift(r.speed, r.efficiency, SHIFT_MINS.s3);
-  const cap = c1 * (Number(r.qtyS1) || 0)
-            + c2 * (Number(r.qtyS2) || 0)
-            + c3 * (Number(r.qtyS3) || 0);
+  const c2 = isFormation ? 0 : capShift(r.speed, r.efficiency, SHIFT_MINS.s2);
+  const c3 = isFormation ? 0 : capShift(r.speed, r.efficiency, SHIFT_MINS.s3);
+  const cap = c1 * (s1On ? (Number(r.qtyS1) || 0) : 0)
+            + c2 * (s2On ? (Number(r.qtyS2) || 0) : 0)
+            + c3 * (s3On ? (Number(r.qtyS3) || 0) : 0);
+
+  const DS = 'background:#f0f2f5;color:var(--text-4);pointer-events:none';
+  const capS1Style = s1On ? 'background:#e9ebf8;color:#4338ca' : DS;
+  const capS2Style = s2On ? 'background:#e9ebf8;color:#4338ca' : DS;
+  const capS3Style = s3On ? 'background:#e9ebf8;color:#4338ca' : DS;
+
+  const qmCell = (sOn, val, shift) => sOn
+    ? `<td class="pc-input"><input type="number" value="${val || ''}" placeholder="0" onchange="updatePC(${i},'${shift}',this.value)" min="0" step="1" style="width:56px;text-align:right"></td>`
+    : `<td style="${DS}"><input type="number" value="" placeholder="—" disabled min="0" step="1" style="width:56px;text-align:right"></td>`;
 
   return `<tr id="pcrow-${i}">
     <td class="text-muted" style="font-size:11px">${i + 1}</td>
-    <td><input type="text"   value="${r.process    || ''}" placeholder="Nama proses" onchange="updatePC(${i},'process',this.value)"></td>
-    <td><input type="text"   value="${r.unit       || ''}" placeholder="Unit"        onchange="updatePC(${i},'unit',this.value)" style="width:72px"></td>
-    <td><input type="number" value="${r.speed      || ''}" placeholder="0"           onchange="updatePC(${i},'speed',this.value)" min="0" step="any"></td>
-    <td><input type="number" value="${r.efficiency || ''}" placeholder="0"           onchange="updatePC(${i},'efficiency',this.value)" min="0" max="100" step="any"></td>
-    <td class="pc-calc" style="background:#e9ebf8">${fmt(c1)}</td>
-    <td class="pc-calc" style="background:#e9ebf8">${fmt(c2)}</td>
-    <td class="pc-calc" style="background:#e9ebf8">${fmt(c3)}</td>
-    <td style="background:#f0fdf4"><input type="number" value="${r.qtyS1 || ''}" placeholder="0" onchange="updatePC(${i},'qtyS1',this.value)" min="0" step="1" style="width:56px;text-align:right"></td>
-    <td style="background:#f0fdf4"><input type="number" value="${r.qtyS2 || ''}" placeholder="0" onchange="updatePC(${i},'qtyS2',this.value)" min="0" step="1" style="width:56px;text-align:right"></td>
-    <td style="background:#f0fdf4"><input type="number" value="${r.qtyS3 || ''}" placeholder="0" onchange="updatePC(${i},'qtyS3',this.value)" min="0" step="1" style="width:56px;text-align:right"></td>
+    <td class="pc-input"><input type="text"   value="${r.process    || ''}" placeholder="Nama proses" onchange="updatePC(${i},'process',this.value)"></td>
+    <td class="pc-input"><input type="text"   value="${r.unit       || ''}" placeholder="Unit"        onchange="updatePC(${i},'unit',this.value)" style="width:110px"></td>
+    <td class="pc-input"><input type="number" value="${r.speed      || ''}" placeholder="0"           onchange="updatePC(${i},'speed',this.value)" min="0" step="any"></td>
+    <td class="pc-input"><input type="number" value="${r.efficiency || ''}" placeholder="0"           onchange="updatePC(${i},'efficiency',this.value)" min="0" max="100" step="any" style="width:52px"></td>
+    <td class="pc-calc" style="${capS1Style}">${fmt(c1)}</td>
+    <td class="pc-calc" style="${capS2Style}">${fmt(c2)}</td>
+    <td class="pc-calc" style="${capS3Style}">${fmt(c3)}</td>
+    <td class="pc-input"><input type="number" value="${r.installedMachine || ''}" placeholder="0" onchange="updatePC(${i},'installedMachine',this.value)" min="0" step="1" style="width:64px;text-align:right"></td>
+    <td class="pc-inst-cap pc-calc" style="background:#dcfce7;color:#15803d">${fmt((c1 + c2 + c3) * (Number(r.installedMachine) || 0))}</td>
+    ${qmCell(s1On, r.qtyS1, 'qtyS1')}
+    ${qmCell(s2On, r.qtyS2, 'qtyS2')}
+    ${qmCell(s3On, r.qtyS3, 'qtyS3')}
     <td class="pc-capacity" style="background:#fef9c3;font-weight:700;color:#854d0e">${cap > 0 ? Math.round(cap).toLocaleString('id-ID') : '—'}</td>
     <td><button class="btn-del" onclick="deletePCRow(${i})" title="Hapus">✕</button></td>
   </tr>`;
@@ -689,23 +906,29 @@ function updatePC(i, field, value) {
   if (!state.processCapacity) state.processCapacity = [];
   state.processCapacity[i][field] = value;
 
-  const r   = state.processCapacity[i];
-  const fmt = v => v > 0 ? Math.round(v).toLocaleString('id-ID') : '—';
-  const capShift = (mins) => (Number(r.speed) || 0) * ((Number(r.efficiency) || 0) / 100) * mins;
+  const r           = state.processCapacity[i];
+  const fmt         = v => v > 0 ? Math.round(v).toLocaleString('id-ID') : '—';
+  const isFormation = r.process === 'Formation';
+  const capShift    = (mins) => (Number(r.speed) || 0) * ((Number(r.efficiency) || 0) / 100) * mins;
+
+  const shiftCfg = currentPeriod ? (state.capacity?.[currentPeriod]?.[r.process] || null) : null;
+  const shiftOn  = s => { if (isFormation && s !== 's1') return false; return shiftCfg ? !!shiftCfg[s] : true; };
 
   const c1 = capShift(SHIFT_MINS.s1);
-  const c2 = capShift(SHIFT_MINS.s2);
-  const c3 = capShift(SHIFT_MINS.s3);
-  const cap = c1 * (Number(r.qtyS1) || 0)
-            + c2 * (Number(r.qtyS2) || 0)
-            + c3 * (Number(r.qtyS3) || 0);
+  const c2 = isFormation ? 0 : capShift(SHIFT_MINS.s2);
+  const c3 = isFormation ? 0 : capShift(SHIFT_MINS.s3);
+  const cap = c1 * (shiftOn('s1') ? (Number(r.qtyS1) || 0) : 0)
+            + c2 * (shiftOn('s2') ? (Number(r.qtyS2) || 0) : 0)
+            + c3 * (shiftOn('s3') ? (Number(r.qtyS3) || 0) : 0);
 
   const row = document.getElementById('pcrow-' + i);
   if (row) {
-    const calcCells = row.querySelectorAll('.pc-calc');
+    const calcCells = row.querySelectorAll('.pc-calc:not(.pc-inst-cap)');
     calcCells[0].textContent = fmt(c1);
     calcCells[1].textContent = fmt(c2);
     calcCells[2].textContent = fmt(c3);
+    const instCapCell = row.querySelector('.pc-inst-cap');
+    if (instCapCell) { instCapCell.textContent = fmt((c1 + c2 + c3) * (Number(r.installedMachine) || 0)); instCapCell.style.background = '#dcfce7'; }
     const capCell = row.querySelector('.pc-capacity');
     if (capCell) capCell.textContent = cap > 0 ? Math.round(cap).toLocaleString('id-ID') : '—';
   }
@@ -714,7 +937,7 @@ function updatePC(i, field, value) {
 function addPCRow() {
   const state = BPMS.getState();
   if (!state.processCapacity) state.processCapacity = [];
-  state.processCapacity.push({ process: '', unit: '', speed: '', efficiency: '', qtyS1: '', qtyS2: '', qtyS3: '' });
+  state.processCapacity.push({ process: '', unit: '', speed: '', efficiency: '', installedMachine: '', qtyS1: '', qtyS2: '', qtyS3: '' });
   renderPCTable();
   // Focus new row's first input
   const rows = document.querySelectorAll('#pcBody tr');
@@ -723,7 +946,9 @@ function addPCRow() {
 }
 
 function deletePCRow(i) {
-  const state = BPMS.getState();
+  const state   = BPMS.getState();
+  const process = state.processCapacity[i]?.process || 'baris ini';
+  if (!confirm(`Hapus "${process}" dari Process Capacity?`)) return;
   state.processCapacity.splice(i, 1);
   renderPCTable();
 }
@@ -745,13 +970,14 @@ async function savePeriod() {
   if (state.processCapacity) {
     document.querySelectorAll('#pcBody tr[id^="pcrow-"]').forEach((row, i) => {
       const inputs = row.querySelectorAll('input');
-      if (inputs[0]) state.processCapacity[i].process    = inputs[0].value;
-      if (inputs[1]) state.processCapacity[i].unit       = inputs[1].value;
-      if (inputs[2]) state.processCapacity[i].speed      = inputs[2].value;
-      if (inputs[3]) state.processCapacity[i].efficiency = inputs[3].value;
-      if (inputs[4]) state.processCapacity[i].qtyS1      = inputs[4].value;
-      if (inputs[5]) state.processCapacity[i].qtyS2      = inputs[5].value;
-      if (inputs[6]) state.processCapacity[i].qtyS3      = inputs[6].value;
+      if (inputs[0]) state.processCapacity[i].process           = inputs[0].value;
+      if (inputs[1]) state.processCapacity[i].unit              = inputs[1].value;
+      if (inputs[2]) state.processCapacity[i].speed             = inputs[2].value;
+      if (inputs[3]) state.processCapacity[i].efficiency        = inputs[3].value;
+      if (inputs[4]) state.processCapacity[i].installedMachine  = inputs[4].value;
+      if (inputs[5]) state.processCapacity[i].qtyS1             = inputs[5].value;
+      if (inputs[6]) state.processCapacity[i].qtyS2             = inputs[6].value;
+      if (inputs[7]) state.processCapacity[i].qtyS3             = inputs[7].value;
     });
   }
   BPMS.showLoading();

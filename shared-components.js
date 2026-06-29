@@ -19,6 +19,7 @@ const BPMS = (() => {
     capacity: {},
     workCalendar: {},
     resumeMB: {},
+    produksiInfor: {},
     mpParams: {
       'Line 1': { std: 2, loader: 1, qc: 1 },
       'Line 2': { std: 2, loader: 1, qc: 1 },
@@ -30,46 +31,77 @@ const BPMS = (() => {
     },
   };
 
-  const NAV_ITEMS = [
+  const NAV_HOME = {
+    href: 'home.html',
+    label: 'Home',
+    icon: `<svg viewBox="0 0 16 16" fill="currentColor" class="nav-icon"><path d="M8 1L1 7h2v7h4v-4h2v4h4V7h2L8 1z"/></svg>`,
+  };
+
+  const NAV_GROUPS = [
     {
-      href: 'home.html',
-      label: 'Home',
-      icon: `<svg viewBox="0 0 16 16" fill="currentColor" class="nav-icon"><path d="M8 1L1 7h2v7h4v-4h2v4h4V7h2L8 1z"/></svg>`,
+      label: 'LVC',
+      items: [
+        {
+          href: 'dashboard.html',
+          label: 'Dashboard',
+          icon: `<svg viewBox="0 0 16 16" fill="currentColor" class="nav-icon"><rect x="1" y="1" width="6" height="7" rx="1"/><rect x="9" y="1" width="6" height="4" rx="1"/><rect x="1" y="10" width="6" height="5" rx="1"/><rect x="9" y="7" width="6" height="8" rx="1"/></svg>`,
+        },
+        {
+          href: 'database-pcs.html',
+          label: 'Database PCS',
+          icon: `<svg viewBox="0 0 16 16" fill="currentColor" class="nav-icon"><ellipse cx="8" cy="4.5" rx="5.5" ry="2"/><path d="M2.5 4.5v2c0 1.1 2.5 2 5.5 2s5.5-.9 5.5-2v-2"/><path d="M2.5 8.5v2c0 1.1 2.5 2 5.5 2s5.5-.9 5.5-2v-2"/></svg>`,
+        },
+        {
+          href: 'database-konversi.html',
+          label: 'Database Konversi',
+          icon: `<svg viewBox="0 0 16 16" fill="currentColor" class="nav-icon"><path d="M2 3h5v4H2V3zm7 0h5v4H9V3zm-7 6h5v4H2V9zm7 0h5v4H9V9z" opacity=".25"/><path d="M2 3h5v4H2V3zm7 0h5v4H9V3zm-7 6h5v4H2V9zm7 0h5v4H9V9z" fill="none" stroke="currentColor" stroke-width="1.2"/><path d="M7 5h2M7 11h2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>`,
+        },
+        {
+          href: 'data-order.html',
+          label: 'Data Order',
+          icon: `<svg viewBox="0 0 16 16" fill="currentColor" class="nav-icon"><path d="M3 2h10a1 1 0 011 1v10a1 1 0 01-1 1H3a1 1 0 01-1-1V3a1 1 0 011-1zm1 2v8h8V4H4zm1 1h6v1.5H5V5zm0 2.5h6V9H5V7.5zm0 2.5h4v1.5H5V10z"/></svg>`,
+        },
+        {
+          href: 'setting-capacity.html',
+          label: 'Setting Kapasitas',
+          icon: `<svg viewBox="0 0 16 16" fill="currentColor" class="nav-icon"><path d="M3 2h10a1 1 0 011 1v10a1 1 0 01-1 1H3a1 1 0 01-1-1V3a1 1 0 011-1zm0 4h10V3H3v3zm3 1H3v6h3V7zm4 0H7v3h3V7zm3 0h-2v6h2V7zm-4 3H7v3h3v-3z"/></svg>`,
+        },
+        {
+          href: 'lvc-analysis.html',
+          label: 'LVC Analysis',
+          icon: `<svg viewBox="0 0 16 16" fill="currentColor" class="nav-icon"><path d="M1 14L5 8.5l3 2.5 4-6L15 7V14H1z" opacity=".25"/><path d="M1 14L5 8.5l3 2.5 4-6L15 7" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>`,
+        },
+        {
+          href: 'man-power.html',
+          label: 'Man Power',
+          icon: `<svg viewBox="0 0 16 16" fill="currentColor" class="nav-icon"><circle cx="6" cy="4" r="2.5"/><path d="M1 13c0-2.76 2.24-5 5-5s5 2.24 5 5H1z"/><circle cx="12" cy="5" r="2"/><path d="M10 13c0-2 1.34-3.7 3.2-4.3"/></svg>`,
+        },
+      ],
     },
     {
-      href: 'dashboard.html',
-      label: 'Dashboard',
-      icon: `<svg viewBox="0 0 16 16" fill="currentColor" class="nav-icon"><rect x="1" y="1" width="6" height="7" rx="1"/><rect x="9" y="1" width="6" height="4" rx="1"/><rect x="1" y="10" width="6" height="5" rx="1"/><rect x="9" y="7" width="6" height="8" rx="1"/></svg>`,
-    },
-    {
-      href: 'database-pcs.html',
-      label: 'Database PCS',
-      icon: `<svg viewBox="0 0 16 16" fill="currentColor" class="nav-icon"><ellipse cx="8" cy="4.5" rx="5.5" ry="2"/><path d="M2.5 4.5v2c0 1.1 2.5 2 5.5 2s5.5-.9 5.5-2v-2"/><path d="M2.5 8.5v2c0 1.1 2.5 2 5.5 2s5.5-.9 5.5-2v-2"/></svg>`,
-    },
-    {
-      href: 'database-konversi.html',
-      label: 'Database Konversi',
-      icon: `<svg viewBox="0 0 16 16" fill="currentColor" class="nav-icon"><path d="M2 3h5v4H2V3zm7 0h5v4H9V3zm-7 6h5v4H2V9zm7 0h5v4H9V9z" opacity=".25"/><path d="M2 3h5v4H2V3zm7 0h5v4H9V3zm-7 6h5v4H2V9zm7 0h5v4H9V9z" fill="none" stroke="currentColor" stroke-width="1.2"/><path d="M7 5h2M7 11h2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>`,
-    },
-    {
-      href: 'data-order.html',
-      label: 'Data Order',
-      icon: `<svg viewBox="0 0 16 16" fill="currentColor" class="nav-icon"><path d="M3 2h10a1 1 0 011 1v10a1 1 0 01-1 1H3a1 1 0 01-1-1V3a1 1 0 011-1zm1 2v8h8V4H4zm1 1h6v1.5H5V5zm0 2.5h6V9H5V7.5zm0 2.5h4v1.5H5V10z"/></svg>`,
-    },
-    {
-      href: 'setting-capacity.html',
-      label: 'Setting Kapasitas',
-      icon: `<svg viewBox="0 0 16 16" fill="currentColor" class="nav-icon"><path d="M3 2h10a1 1 0 011 1v10a1 1 0 01-1 1H3a1 1 0 01-1-1V3a1 1 0 011-1zm0 4h10V3H3v3zm3 1H3v6h3V7zm4 0H7v3h3V7zm3 0h-2v6h2V7zm-4 3H7v3h3v-3z"/></svg>`,
-    },
-    {
-      href: 'lvc-analysis.html',
-      label: 'LVC Analysis',
-      icon: `<svg viewBox="0 0 16 16" fill="currentColor" class="nav-icon"><path d="M1 14L5 8.5l3 2.5 4-6L15 7V14H1z" opacity=".25"/><path d="M1 14L5 8.5l3 2.5 4-6L15 7" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>`,
-    },
-    {
-      href: 'man-power.html',
-      label: 'Man Power',
-      icon: `<svg viewBox="0 0 16 16" fill="currentColor" class="nav-icon"><circle cx="6" cy="4" r="2.5"/><path d="M1 13c0-2.76 2.24-5 5-5s5 2.24 5 5H1z"/><circle cx="12" cy="5" r="2"/><path d="M10 13c0-2 1.34-3.7 3.2-4.3"/></svg>`,
+      label: 'Parameter Asumsi',
+      items: [
+        {
+          href: 'pa-dashboard.html',
+          label: 'Dashboard',
+          icon: `<svg viewBox="0 0 16 16" fill="currentColor" class="nav-icon"><rect x="1" y="1" width="6" height="7" rx="1"/><rect x="9" y="1" width="6" height="4" rx="1"/><rect x="1" y="10" width="6" height="5" rx="1"/><rect x="9" y="7" width="6" height="8" rx="1"/></svg>`,
+        },
+        {
+          href: 'resume.html',
+          label: 'Resume',
+          icon: `<svg viewBox="0 0 16 16" fill="currentColor" class="nav-icon"><path d="M3 1h10a1 1 0 011 1v12a1 1 0 01-1 1H3a1 1 0 01-1-1V2a1 1 0 011-1zm1 2v10h8V3H4zm1 2h6v1.5H5V5zm0 2.5h6V9H5V7.5zm0 2.5h4v1.5H5V10z"/></svg>`,
+        },
+        {
+          href: 'data-produksi-infor.html',
+          label: 'Data Produksi Infor',
+          icon: `<svg viewBox="0 0 16 16" fill="currentColor" class="nav-icon"><path d="M1 11h3V6H1v5zm4 2h3V3H5v10zm4-6h3v6H9V7zm-8 6h14v1.5H1V13z" opacity=".8"/></svg>`,
+        },
+        {
+          href: 'data-produksi-baan.html',
+          label: 'Data Produksi BaaN',
+          icon: `<svg viewBox="0 0 16 16" fill="currentColor" class="nav-icon"><path d="M1 11h3V6H1v5zm4 2h3V3H5v10zm4-6h3v6H9V7zm-8 6h14v1.5H1V13z" opacity=".8"/><circle cx="13" cy="4" r="2.5" fill="var(--accent)" opacity=".6"/></svg>`,
+        },
+      ],
     },
   ];
 
@@ -136,16 +168,23 @@ const BPMS = (() => {
   // ── Sidebar HTML ───────────────────────────────────────────────
 
   function renderSidebar() {
-    const current    = location.pathname.split('/').pop() || 'index.html';
-    const collapsed  = localStorage.getItem('bpms_sidebar') === 'collapsed';
+    const current   = location.pathname.split('/').pop() || 'index.html';
+    const collapsed = localStorage.getItem('bpms_sidebar') === 'collapsed';
 
-    const items = NAV_ITEMS.map(({ href, label, icon }) => {
+    function navItem({ href, label, icon }) {
       const active = (current === href) || (!current && href === 'home.html');
       return `<a href="${href}" class="nav-item${active ? ' active' : ''}" data-label="${label}">
         ${icon}
         <span class="nav-label">${label}</span>
       </a>`;
-    }).join('');
+    }
+
+    const homeHtml = navItem(NAV_HOME);
+
+    const groupsHtml = NAV_GROUPS.map(g => `
+      <div class="nav-section-label">${g.label}</div>
+      ${g.items.map(navItem).join('')}
+    `).join('');
 
     return `
       <div class="sidebar-overlay" id="sidebarOverlay"></div>
@@ -163,8 +202,8 @@ const BPMS = (() => {
           </button>
         </div>
         <nav class="sidebar-nav">
-          <div class="nav-section-label">Navigasi</div>
-          ${items}
+          ${homeHtml}
+          ${groupsHtml}
         </nav>
         <div class="sidebar-footer">
           <div class="server-status" id="serverStatus">
@@ -428,26 +467,50 @@ const BPMS = (() => {
   // ── Calendar init ───────────────────────────────────────────────
 
   const HOLIDAYS_2026 = {
-    '2026-01-01':'Tahun Baru Masehi',
-    '2026-01-27':'Tahun Baru Imlek',
-    '2026-01-28':'Cuti Bersama Imlek',
-    '2026-03-28':'Idul Fitri 1447 H (1)',
-    '2026-03-29':'Idul Fitri 1447 H (2)',
-    '2026-03-30':'Cuti Bersama Idul Fitri',
-    '2026-03-31':'Cuti Bersama Idul Fitri',
-    '2026-04-02':'Wafat Isa Al Masih',
-    '2026-04-13':'Isra Mi\'raj',
-    '2026-05-01':'Hari Buruh',
-    '2026-05-14':'Kenaikan Isa Al Masih',
-    '2026-05-29':'Hari Raya Waisak',
-    '2026-06-01':'Hari Lahir Pancasila',
-    '2026-06-06':'Idul Adha 1447 H',
-    '2026-06-26':'Tahun Baru Islam 1448 H',
-    '2026-08-17':'Hari Kemerdekaan RI',
-    '2026-09-04':'Maulid Nabi Muhammad SAW',
-    '2026-12-25':'Hari Raya Natal',
-    '2026-12-26':'Cuti Bersama Natal',
+    // Libur Nasional
+    '2026-01-01': 'Tahun Baru Masehi',
+    '2026-01-16': 'Isra Mi\'raj Nabi Muhammad',
+    '2026-02-17': 'Tahun Baru Imlek 2577 Kongzili',
+    '2026-03-19': 'Hari Raya Nyepi Tahun Baru Saka 1948',
+    '2026-03-21': 'Hari Raya Idul Fitri 1447 H',
+    '2026-03-22': 'Hari Raya Idul Fitri 1447 H (2)',
+    '2026-04-03': 'Wafat Isa Al Masih',
+    '2026-04-05': 'Hari Paskah',
+    '2026-05-01': 'Hari Buruh',
+    '2026-05-14': 'Kenaikan Isa Al Masih',
+    '2026-05-27': 'Hari Raya Idul Adha 1447 H',
+    '2026-05-31': 'Hari Raya Waisak 2570 BE',
+    '2026-06-01': 'Hari Lahir Pancasila',
+    '2026-06-16': 'Tahun Baru Islam 1448 H',
+    '2026-08-17': 'Hari Kemerdekaan RI',
+    '2026-08-25': 'Maulid Nabi',
+    '2026-12-25': 'Hari Raya Natal',
+    // Cuti Bersama
+    '2026-02-16': 'Cuti Bersama (Imlek)',
+    '2026-03-20': 'Cuti Bersama (Idul Fitri)',
+    '2026-03-23': 'Cuti Bersama (Idul Fitri)',
+    '2026-03-24': 'Cuti Bersama (Idul Fitri)',
+    '2026-05-15': 'Cuti Bersama (Kenaikan Isa Al Masih)',
+    // Libur dengan Penggantian
+    '2026-01-02': 'Libur dengan Penggantian',
+    '2026-03-18': 'Libur dengan Penggantian',
+    '2026-03-25': 'Libur dengan Penggantian',
+    '2026-06-15': 'Libur dengan Penggantian',
+    '2026-08-24': 'Libur dengan Penggantian',
+    '2026-10-09': 'Libur dengan Penggantian',
+    '2026-12-31': 'Libur dengan Penggantian',
   };
+
+  // Sabtu yang menjadi hari kerja pengganti
+  const WORKING_DAYS_2026 = new Set([
+    '2026-01-10', // Hari Kerja Pengganti
+    '2026-02-14', // Hari Kerja Pengganti
+    '2026-03-28', // Hari Kerja Pengganti
+    '2026-05-09', // Hari Kerja Pengganti
+    '2026-05-30', // Hari Kerja Pengganti
+    '2026-06-20', // Hari Kerja Pengganti
+    '2026-08-29', // Hari Kerja Pengganti
+  ]);
 
   function initCalendarForPeriod(period) {
     if (_state.workCalendar[period]) return; // already exists
@@ -460,7 +523,7 @@ const BPMS = (() => {
       const ds  = `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
       const dow = new Date(y, m-1, d).getDay(); // 0=Sun
       const isWeekend = dow === 0 || dow === 6;
-      cal[ds] = !isWeekend && !HOLIDAYS_2026[ds];
+      cal[ds] = (!isWeekend || WORKING_DAYS_2026.has(ds)) && !HOLIDAYS_2026[ds];
     }
 
     _state.workCalendar[period] = cal;
@@ -512,7 +575,7 @@ const BPMS = (() => {
     parseItemString, findPCSMatches, calcLVC,
     shiftMinutes, getWorkDayCount, getCapacityHours,
     initCalendarForPeriod, initCapacityForPeriod, calcPCSFields,
-    HOLIDAYS_2026,
+    HOLIDAYS_2026, WORKING_DAYS_2026,
     fmtNum, fmtInt,
     DEFAULT_STATE,
   };

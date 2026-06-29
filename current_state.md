@@ -1,7 +1,7 @@
 # Factory Analytics Hub (FAH) — Current State & Activity Log
 
 **Project:** Factory Analytics Hub (FAH) v1.0  
-**Last Updated:** 2026-05-05 (session 2)  
+**Last Updated:** 2026-06-29  
 **Stack:** HTML5 + Vanilla JS + PHP (state.php) + SheetJS
 
 ---
@@ -19,6 +19,10 @@
 | Setting Kapasitas | `setting-capacity.html` | ✅ Selesai |
 | Man Power | `man-power.html` | ✅ Selesai (redesign) |
 | Database Konversi | `database-konversi.html` | 🔲 Placeholder |
+| PA — Dashboard | `pa-dashboard.html` | 🔲 Stub (Parameter Asumsi) |
+| PA — Resume | `resume.html` | 🔶 Tabel struktur selesai (data kosong) |
+| PA — Data Produksi Infor | `data-produksi-infor.html` | ✅ Selesai (upload Excel, tab Data + Summary, filter, export) |
+| PA — Data Produksi BaaN | `data-produksi-baan.html` | 🔲 Stub (Parameter Asumsi) |
 | Shared Components | `shared-components.js` | ✅ Selesai |
 | Stylesheet | `style.css` | ✅ Selesai |
 | Backend API | `api/state.php` | ✅ Selesai |
@@ -27,7 +31,47 @@
 
 ## Activity Log
 
+### 2026-06-29 (3)
+- **resume.html** — Halaman Resume dibangun dari `Tabel Resume.xlsx`. Tabel tahun (2013–2025) sebagai kolom, dan baris-baris proses: Plate/battery, Berat lead/battery, Berat lead/panel, Assembling, Grid Casting (Pos/Neg/Total/Battery), Grid Punching, Ball Mill, Pasting Casting, Pasting Punching, Formation, Asam Sulfat. Data dikosongkan dulu (—). Sticky header + sticky 3 kolom kiri (Proses, Sub, Satuan). Export Excel via SheetJS.
+
+### 2026-06-29 (2)
+- **data-produksi-infor.html** — Tab "Generated Data Produksi Infor" diimplementasikan penuh dan **terverifikasi** oleh user. 16 kolom: No, Date, Year, Code, Item Battery, Item Assy, Qty Produksi, Code Battery, Plate Positif, Grid Process (+), Qty Plate (+), Pule (+), Plate Negatif, Grid Process (-), Qty Plate (-), Pule (-). Logika: Item Assy = field Item (raw); Item Battery = Item Assy dengan char[0]→'F' dan char[4]→'W' jika diawali 'W'; Code Battery = MID(itemBattery, 3, 17). Lookup dari Database Konversi (dbPlateInfor, dbTypePlate, dbPuLe) via `buildLookupMapsPI()` + `computeGenPiRow()`. Export ke `FAH_ProduksiInfor_Generated_YYYY-MM.xlsx`.
+
+### 2026-06-29
+- **api/produksi-infor.php** — API opsional untuk backup ke server (jika PHP berjalan). Data disimpan di `data/produksi-infor/YYYY-MM.json` per periode.
+- **data-produksi-infor.html** — Refactor arsitektur penyimpanan ke **IndexedDB** (`bpms_produksi_infor` DB, store `periods`). Tidak butuh server PHP, tidak ada size limit. `PiDB` singleton (wrap IndexedDB API jadi Promise-based): `getPeriods()`, `getData(period)`, `setData(period, rows)`, `deleteData(period)`. `_piCache` sebagai in-memory cache atas IndexedDB. `commitUpload()` → `PiDB.setData()`, `populatePeriods()` → `PiDB.getPeriods()`, `deletePeriod()` → `PiDB.deleteData()`, `loadPeriodData()` → `PiDB.getData()`. `pageInit()` async. Date parsing: `cellDates: true` + `normalizeTrxDate()` (Date object / serial / string → "DD/MM/YYYY").
+
+### 2026-06-26 (5)
+- **data-produksi-infor.html** — Fix bug "Tidak ada data valid untuk disimpan": SheetJS membaca date cell Excel sebagai serial number (angka) bukan string. Tambah `cellDates: true` ke `XLSX.read`. Tambah `normalizeTrxDate()` yang menangani Date object, serial number (via `XLSX.SSF.parse_date_code`), dan string, semuanya dikonversi ke format "DD/MM/YYYY" sebelum disimpan ke state.
+
+### 2026-06-26 (4)
+- **data-produksi-infor.html** — Upload modal disederhanakan: hapus pilihan Bulan/Tahun. Periode kini dideteksi otomatis dari kolom `Trx. Date` (format DD/MM/YYYY). Data dari file yang mencakup banyak bulan (mis. FY2025) otomatis digroup per periode dan disimpan ke masing-masing `produksiInfor['YYYY-MM']`. Preview menampilkan badge periode yang terdeteksi + jumlah record per periode.
+
+### 2026-06-26 (3)
+- **data-produksi-infor.html** — Kolom tabel disesuaikan dengan struktur aktual Excel Infor (15 kolom: Trx. Date, Trx. Time, WH, Trx Number, Order No, Transaction Type, Line, Item, Item Descriptions, Lot No, Model, Qty, Information, User, ResCode). HEADER_MAP diupdate. Stats diubah menjadi Total Record / Total Qty / Line Aktif / Unique Item. Render chunked (500 baris/frame) untuk performa file besar (49k baris). Filter tersedia pada kolom: Trx. Date, WH, Transaction Type, Line, Model, User.
+
+### 2026-06-26 (2)
+- **data-produksi-infor.html** — Halaman penuh (menggantikan stub): upload Excel via modal bulan/tahun + drag-drop, state key `produksiInfor` per periode, 2 tab (Data Produksi + Summary per Line), kolom filter pada header tabel, stats cards (Total Record, Qty Plan, Qty Aktual, Achievement %), achievement bar grafik, export Raw + export Summary ke Excel (SheetJS).
+- **shared-components.js** — Tambah `produksiInfor: {}` ke `DEFAULT_STATE`.
+
+### 2026-06-26
+- **shared-components.js** — `NAV_ITEMS` dipecah menjadi `NAV_HOME` + `NAV_GROUPS`. Sidebar kini menampilkan dua kelompok: **LVC** (Dashboard, Database PCS, Database Konversi, Data Order, Setting Kapasitas, LVC Analysis, Man Power) dan **Parameter Asumsi** (Dashboard, Resume, Data Produksi Infor, Data Produksi BaaN). `renderSidebar()` diupdate agar merender section label per grup.
+- **pa-dashboard.html** — Stub halaman Dashboard grup Parameter Asumsi (placeholder, dalam pengembangan).
+- **resume.html** — Stub halaman Resume grup Parameter Asumsi.
+- **data-produksi-infor.html** — Stub halaman Data Produksi Infor grup Parameter Asumsi.
+- **data-produksi-baan.html** — Stub halaman Data Produksi BaaN grup Parameter Asumsi.
+
+### 2026-06-11
+- **lvc-analysis.html** — Card Assembling: `installedCap` tidak lagi dari `getCapacityHours` melainkan dari `state.processCapacity` (Setting Kapasitas → Process Capacity). Untuk setiap bulan, installed capacity dihitung sebagai total dari Line 1–7: `speed × (eff/100) × (435+405+370) × installedMachine × workdays`. Tambah property `installedCapLineRange: [1, 7]` pada proc config Assembling; `calcMonthData` menggunakan path baru jika property ini ada. Unit badge header diubah dari `Jam/Bln` → `pcs/Bln`. Sidebar stat Σ CAP unit label diubah dari hardcoded `Jam` menjadi dinamis (`loadUnit`) agar konsisten dengan unit loading.
+
 ### 2026-05-05
+- **shared-components.js** — `HOLIDAYS_2026` diperbarui sesuai Kalender Kerja 2026 PT Century: Libur Nasional (Isra Mi'raj 16 Jan, Imlek 17 Feb, Nyepi 19 Mar, Idul Fitri 21-22 Mar, Wafat 3 Apr, Paskah 5 Apr, Idul Adha 27 Mei, Waisak 31 Mei, Tahun Baru Islam 16 Jun, Maulid Nabi 25 Agu) + Cuti Bersama (5 tanggal) + Libur dengan Penggantian (7 tanggal). Tambah `WORKING_DAYS_2026` (7 Sabtu kerja pengganti Jan-Agu). `initCalendarForPeriod` diupdate agar hari kerja pengganti diinisialisasi ON.
+- **setting-capacity.html** — Kalender Kerja: redesign UI lengkap — header dengan badge "Hari ON: N", legend chips berwarna, grid hari dengan kode warna per kategori (ON hijau, OFF abu dashed, Libur Nasional merah, Cuti Bersama kuning, Libur Penggantian oranye, Kerja Pengganti hijau tua), titik indikator di pojok kanan atas tiap hari istimewa, panel keterangan kanan dengan daftar hari istimewa + badge ON/OFF. Outer grid diubah 1fr:1fr → 3fr:2fr untuk memberikan ruang lebih ke kalender.
+- **setting-capacity.html** — Kalender: tambah class `work-replace` (hijau) untuk Sabtu hari kerja pengganti; legend kalender ditambah item "Kerja Pengganti".
+- **setting-capacity.html** — Period selector disederhanakan: hapus inline `<input type="month">`, ganti dengan tombol "+ Tambah Periode" yang membuka modal popup (Bulan dropdown + Tahun input ▲▼) sama seperti Data Order. Label dropdown hanya nama bulan tanpa suffix YYYY-MM.
+- **setting-capacity.html** — Process Capacity: baris "Formation" hanya aktif di Shift 1 — Kapasitas/Shift 2 & 3 ditampilkan `—` (abu-abu, non-interaktif), input Qty Machine S2 & S3 disabled. Kalkulasi Installed Capacity dan Capacity/day otomatis menggunakan c2=c3=0 untuk Formation.
+- **setting-capacity.html** — Tabel Process Capacity: auto-save ketika fokus berpindah keluar tabel (`focusout` pada `#pcTable`, cek `relatedTarget` tidak di dalam tabel → `BPMS.saveState()` silent tanpa toast/loading).
+- **setting-capacity.html** — Tabel Process Capacity: tambah 2 kolom baru di antara Kapasitas/Shift dan Qty Machine. (1) "Installed Machine (unit)" — input manual per baris, disimpan ke field `installedMachine` di state. (2) "Installed Capacity" — kalkulasi otomatis Kap/Shift1 + Kap/Shift2 + Kap/Shift3. `syncProcessCapacity` dan `addPCRow` diupdate untuk field baru; `updatePC` refresh sel Installed Capacity via class `pc-inst-cap`; `savePeriod` indeks input digeser +1.
 - **lvc-analysis.html** — Card Formation: ganti label loading menjadi "Loading (panel)", unit "panel". Logic: sum (Qty Plate Positif + Qty Plate Negatif) × Qty Produksi dari semua order di bulan tersebut yang Spec Code = 'D'. Tambah helper `buildPlateMap()` (baca `dbPlateInfor` dari state, lookup by "Item Data Infor" key). Config proc: `loadQtyFrom: 'formationPanel'`, `qtyOnly: true`, `loadLabelText`, `loadUnitText`. `renderProcessCard` diupdate: `useQty` juga true bila `proc.loadQtyFrom` ada; gunakan `proc.loadLabelText`/`loadUnitText` jika di-set.
 - **data-order.html** — Fix tab "Data Order" tidak menampilkan data: tambah `renderOrders()` di handler klik tab `data-order`, dan panggil `renderOrders()` di `pageInit()` bersama `renderResume()` agar stat cards terisi saat halaman dibuka.
 - **data-order.html** — Auto-load periode terbaru saat halaman dibuka: `pageInit()` cari period dengan data terbaru dari `orders`, set ke `sel.value` dan `currentPeriod`, lalu render semua panel.

@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Resume — Factory Analytics Hub</title>
+  <link rel="stylesheet" href="style.css"/>
+  <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+  <style>
+    .resume-wrap { padding: 0 24px 48px; }
+
+    .resume-toolbar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 16px 0 14px;
+    }
+    .resume-title {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--text-primary);
+      flex: 1;
+    }
+    .resume-status {
+      font-size: 12px;
+      color: var(--text-secondary, #888);
+    }
+
+    .tbl-scroll { overflow-x: auto; }
+
+    .tbl-resume {
+      border-collapse: collapse;
+      width: max-content;
+      min-width: 100%;
+      font-size: 12.5px;
+    }
+    .tbl-resume th,
+    .tbl-resume td {
+      border: 1px solid var(--border, #d8dde6);
+      padding: 5px 10px;
+      white-space: nowrap;
+    }
+    .tbl-resume thead th {
+      background: var(--bg-secondary, #f5f6f8);
+      font-weight: 600;
+      text-align: center;
+      position: sticky;
+      top: 0;
+      z-index: 3;
+    }
+    .tbl-resume thead th.col-proses {
+      text-align: left;
+      min-width: 170px;
+      position: sticky;
+      left: 0;
+      z-index: 4;
+    }
+    .tbl-resume thead th.col-sub  { min-width: 80px;  position: sticky; left: 170px; z-index: 4; }
+    .tbl-resume thead th.col-unit { min-width: 65px;  position: sticky; left: 250px; z-index: 4; }
+    .tbl-resume thead th.col-year { min-width: 100px; }
+
+    .tbl-resume tbody td.cell-group {
+      position: sticky;
+      left: 0;
+      z-index: 1;
+      font-weight: 600;
+      background: var(--bg-accent, #eef1f7);
+      vertical-align: middle;
+    }
+    .tbl-resume tbody td.cell-sub {
+      position: sticky;
+      left: 170px;
+      z-index: 1;
+      background: #fff;
+      color: var(--text-secondary, #666);
+    }
+    .tbl-resume tbody td.cell-unit {
+      position: sticky;
+      left: 250px;
+      z-index: 1;
+      background: #fff;
+      text-align: center;
+      color: var(--text-secondary, #666);
+    }
+
+    .tbl-resume td.cell-val {
+      text-align: right;
+      color: var(--text-muted, #aaa);
+    }
+    .tbl-resume td.cell-val.has-data {
+      color: var(--text-primary, #222);
+    }
+
+    .tbl-resume tr.row-single td.cell-group { background: var(--bg-secondary, #f5f6f8); }
+    .tbl-resume tr.row-single td.cell-sub,
+    .tbl-resume tr.row-single td.cell-unit  { background: var(--bg-secondary, #f5f6f8); }
+
+    .tbl-resume tr.row-total td            { background: var(--bg-total, #e8f4e8) !important; font-weight: 600; }
+    .tbl-resume tr.row-total td.cell-sub,
+    .tbl-resume tr.row-total td.cell-unit  { background: var(--bg-total, #e8f4e8) !important; }
+
+    .tbl-resume tr.row-battery td { font-style: italic; }
+
+    .tbl-resume tbody tr:hover td { filter: brightness(0.96); }
+  </style>
+</head>
+<body>
+<div class="app-layout">
+  <div id="sidebarMount"></div>
+
+  <div class="main-content">
+    <div id="topbarMount"></div>
+
+    <div class="page-body">
+      <div class="resume-wrap">
+        <div class="resume-toolbar">
+          <span class="resume-title">Resume Produksi</span>
+          <span class="resume-status" id="loadStatus"></span>
+          <button class="btn-secondary btn-sm" onclick="exportTable()">Export Excel</button>
+        </div>
+
+        <div class="tbl-scroll">
+          <table class="tbl-resume" id="resumeTable">
+            <thead>
+              <tr id="yearHeader">
+                <th class="col-proses">Proses</th>
+                <th class="col-sub">Sub</th>
+                <th class="col-unit">Satuan</th>
+              </tr>
+            </thead>
+            <tbody id="resumeTbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="shared-components.js"></script>
+<script>
+/* ── IndexedDB (read-only, same DB as data-produksi-infor.html) ── */
+const PiDB = (() => {
+  const DB_NAME = 'bpms_produksi_infor';
+  const DB_VER  = 1;
+  const STORE   = 'periods';
+  function open() {
+    return new Promise((resolve, reject) => {
+      const req = indexedDB.open(DB_NAME, DB_VER);
+      req.onupgradeneeded = e => e.target.result.createObjectStore(STORE);
+      req.onsuccess = e => resolve(e.target.result);
+      req.onerror   = e => reject(e.target.error);
+    });
+  }
+  async function getPeriods() {
+    const db = await open();
+    return new Promise((resolve, reject) => {
+      const tx  = db.transaction(STORE, 'readonly');
+      const req = tx.objectStore(STORE).getAllKeys();
+      req.onsuccess = e => resolve(e.target.result || []);
+      req.onerror   = e => reject(e.target.error);
+    });
+  }
+  async function getData(period) {
+    const db = await open();
+    return new Promise((resolve, reject) => {
+      const tx  = db.transaction(STORE, 'readonly');
+      const req = tx.objectStore(STORE).get(period);
+      req.onsuccess = e => resolve(e.target.result || []);
+      req.onerror   = e => reject(e.target.error);
+    });
+  }
+  return { getPeriods, getData };
+})();
+
+/* ── Table structure ── */
+const YEARS = [2013,2014,2015,2016,2017,2018,2019,2020,2021,2022,2023,2024,2025];
+
+const RESUME_STRUCTURE = [
+  { label:'Plate/battery',      type:'single', unit:'panel', key:'plateBattery' },
+  { label:'Berat lead/battery', type:'single', unit:'kg',    key:'beratLeadBattery' },
+  { label:'Berat lead/panel',   type:'single', unit:'kg',    key:'beratLeadPanel' },
+  { label:'Assembling',         type:'single', unit:'pcs',   key:'assembling' },
+  { label:'Grid Casting',    type:'group', key:'gridCasting', rows:[
+    { sub:'Pos',     unit:'panel',                   subKey:'pos' },
+    { sub:'Neg',     unit:'panel',                   subKey:'neg' },
+    { sub:'Total',   unit:'panel', isTotal:true,     subKey:'total' },
+    { sub:'Battery', unit:'pcs',   isBattery:true,   subKey:'battery' },
+  ]},
+  { label:'Grid Punching',   type:'group', key:'gridPunching', rows:[
+    { sub:'Pos',     unit:'panel',                   subKey:'pos' },
+    { sub:'Neg',     unit:'panel',                   subKey:'neg' },
+    { sub:'Total',   unit:'panel', isTotal:true,     subKey:'total' },
+    { sub:'Battery', unit:'pcs',   isBattery:true,   subKey:'battery' },
+  ]},
+  { label:'Ball Mill',       type:'group', key:'ballMill', rows:[
+    { sub:'Pos',     unit:'kg',                      subKey:'pos' },
+    { sub:'Neg',     unit:'kg',                      subKey:'neg' },
+    { sub:'Total',   unit:'kg',    isTotal:true,     subKey:'total' },
+    { sub:'Battery', unit:'pcs',   isBattery:true,   subKey:'battery' },
+  ]},
+  { label:'Pasting Casting', type:'group', key:'pastingCasting', rows:[
+    { sub:'Pos',     unit:'panel',                   subKey:'pos' },
+    { sub:'Neg',     unit:'panel',                   subKey:'neg' },
+    { sub:'Total',   unit:'panel', isTotal:true,     subKey:'total' },
+    { sub:'Battery', unit:'pcs',   isBattery:true,   subKey:'battery' },
+  ]},
+  { label:'Pasting Punching', type:'group', key:'pastingPunching', rows:[
+    { sub:'Pos',     unit:'panel',                   subKey:'pos' },
+    { sub:'Neg',     unit:'panel',                   subKey:'neg' },
+    { sub:'Total',   unit:'panel', isTotal:true,     subKey:'total' },
+    { sub:'Battery', unit:'pcs',   isBattery:true,   subKey:'battery' },
+  ]},
+  { label:'Formation',       type:'group', key:'formation', rows:[
+    { sub:'Pos',     unit:'panel',                   subKey:'pos' },
+    { sub:'Neg',     unit:'panel',                   subKey:'neg' },
+    { sub:'Total',   unit:'panel', isTotal:true,     subKey:'total' },
+    { sub:'Battery', unit:'pcs',   isBattery:true,   subKey:'battery' },
+  ]},
+  { label:'Asam Sulfat',     type:'group', key:'asamSulfat', rows:[
+    { sub:'Pos',     unit:'kg',                      subKey:'pos' },
+    { sub:'Neg',     unit:'kg',                      subKey:'neg' },
+    { sub:'Total',   unit:'kg',    isTotal:true,     subKey:'total' },
+    { sub:'Battery', unit:'pcs',   isBattery:true,   subKey:'battery' },
+  ]},
+];
+
+/* ── Helpers ── */
+function rowKey(item, sr) {
+  return sr ? `${item.key}_${sr.subKey}` : item.key;
+}
+
+function fmt(n) {
+  if (n === null || n === undefined || n === '') return '—';
+  return Number(n).toLocaleString('id-ID');
+}
+
+function fmtDec(n, d = 4) {
+  if (n === null || n === undefined || n === '') return '—';
+  return Number(n).toLocaleString('id-ID', { minimumFractionDigits: d, maximumFractionDigits: d });
+}
+
+function emptyCells(rk) {
+  return YEARS.map(y =>
+    `<td class="cell-val" data-rowkey="${rk}" data-year="${y}">—</td>`
+  ).join('');
+}
+
+function fillCell(rk, year, value, isDecimal) {
+  const td = document.querySelector(`td[data-rowkey="${rk}"][data-year="${year}"]`);
+  if (!td) return;
+  const display = isDecimal ? fmtDec(value) : fmt(value);
+  td.textContent = display;
+  if (value !== null && value !== undefined && value !== '' && value !== 0) {
+    td.classList.add('has-data');
+  }
+}
+
+/* ── Build table DOM ── */
+function buildTable() {
+  const hRow = document.getElementById('yearHeader');
+  YEARS.forEach(y => {
+    const th = document.createElement('th');
+    th.className = 'col-year';
+    th.textContent = y;
+    hRow.appendChild(th);
+  });
+
+  const parts = [];
+  for (const item of RESUME_STRUCTURE) {
+    if (item.type === 'single') {
+      const rk = rowKey(item);
+      parts.push(`<tr class="row-single" data-rowkey="${rk}">
+        <td class="cell-group">${item.label}</td>
+        <td class="cell-sub"></td>
+        <td class="cell-unit">${item.unit}</td>
+        ${emptyCells(rk)}
+      </tr>`);
+    } else {
+      item.rows.forEach((sr, i) => {
+        const rk = rowKey(item, sr);
+        const groupTd = i === 0
+          ? `<td class="cell-group" rowspan="${item.rows.length}">${item.label}</td>`
+          : '';
+        const trClass = sr.isTotal ? 'row-total' : sr.isBattery ? 'row-battery' : '';
+        parts.push(`<tr class="${trClass}" data-rowkey="${rk}">
+          ${groupTd}
+          <td class="cell-sub">${sr.sub}</td>
+          <td class="cell-unit">${sr.unit}</td>
+          ${emptyCells(rk)}
+        </tr>`);
+      });
+    }
+  }
+  document.getElementById('resumeTbody').innerHTML = parts.join('');
+}
+
+/* ── Generated Data lookup helpers (sama dengan data-produksi-infor.html) ── */
+function findColKeyPI(rowSample, ...patterns) {
+  const keys = Object.keys(rowSample);
+  for (const pat of patterns) {
+    const k = keys.find(k => k.trim().toLowerCase() === pat.toLowerCase());
+    if (k) return k;
+  }
+  for (const pat of patterns) {
+    const k = keys.find(k => k.trim().toLowerCase().includes(pat.toLowerCase()));
+    if (k) return k;
+  }
+  return null;
+}
+
+function buildLookupMapsPI() {
+  const state = BPMS.getState();
+
+  const plateMap = new Map();
+  const plateRows = state.dbPlateInfor || [];
+  if (plateRows.length) {
+    const s    = plateRows[0];
+    const vals = Object.keys(s);
+    const kKey = findColKeyPI(s, 'Item Data Infor', 'ItemDataInfor') || vals[1];
+    const kPnP = findColKeyPI(s, 'PN Plate Positif', 'PN Positif')   || vals[2];
+    const kQtP = findColKeyPI(s, 'Qty Plate Positif', 'Qty Positif') || vals[3];
+    const kPnN = findColKeyPI(s, 'PN Plate Negatif', 'PN Negatif')   || vals[4];
+    const kQtN = findColKeyPI(s, 'Qty Plate Negatif', 'Qty Negatif') || vals[5];
+    plateRows.forEach(row => {
+      const key = String(row[kKey] ?? '').trim();
+      if (!key) return;
+      plateMap.set(key, {
+        pnPos : String(row[kPnP] ?? ''),
+        qtyPos: Number(row[kQtP]) || 0,
+        pnNeg : String(row[kPnN] ?? ''),
+        qtyNeg: Number(row[kQtN]) || 0,
+      });
+    });
+  }
+
+  const typeMap = new Map();
+  const typeRows = state.dbTypePlate || [];
+  if (typeRows.length) {
+    const s     = typeRows[0];
+    const vals  = Object.keys(s);
+    const kCode = findColKeyPI(s, 'Type Plate', 'Code') || vals[2];
+    const kGrid = findColKeyPI(s, 'Grid Process', 'Grid') || vals[3];
+    typeRows.forEach(row => {
+      const key = String(row[kCode] ?? '').trim();
+      if (key) typeMap.set(key, String(row[kGrid] ?? ''));
+    });
+  }
+
+  const puLeMap = new Map();
+  const puLeRows = state.dbPuLe || [];
+  if (puLeRows.length) {
+    const s      = puLeRows[0];
+    const vals   = Object.keys(s);
+    const kPN    = findColKeyPI(s, 'PN Plate Infor', 'PN Plate', 'PN') || vals[2];
+    const kRatio = findColKeyPI(s, 'Qty Pule/Plate (kg)', 'Qty Pule/Plate', 'Qty Pule') || vals[4];
+    puLeRows.forEach(row => {
+      const key = String(row[kPN] ?? '').trim();
+      if (key) puLeMap.set(key, Number(row[kRatio]) || 0);
+    });
+  }
+
+  return { plateMap, typeMap, puLeMap };
+}
+
+function puleKeyPI(pn) {
+  return pn.charAt(2) === 'F' ? 'W-UNPL-' + pn.substring(7) : pn;
+}
+
+function computeGenPiRow(r, maps) {
+  const { plateMap, typeMap, puLeMap } = maps;
+  const item = r.item || '';
+  const qty  = r.qty  || 0;
+  const code = item.charAt(4);
+  const itemAssy = item;
+  let itemBattery = itemAssy;
+  if (itemAssy.charAt(0) === 'W') {
+    const c = itemAssy.split('');
+    c[0] = 'F'; c[4] = 'W';
+    itemBattery = c.join('');
+  }
+  const itemDataInfor = item.substring(2, 19);
+  const codeBattery   = itemBattery.substring(2, 19);
+  const year          = r.trxDate ? r.trxDate.slice(-4) : '';
+  const wo            = String(r.orderNo || '').substring(0, 4);
+  const pv    = plateMap.get(itemDataInfor) || {};
+  const pnPos = pv.pnPos  || '';
+  const qpPos = (pv.qtyPos || 0) * qty;
+  const pnNeg = pv.pnNeg  || '';
+  const qpNeg = (pv.qtyNeg || 0) * qty;
+  const gridPos = typeMap.get(pnPos.substring(7, 11)) ?? '';
+  const gridNeg = typeMap.get(pnNeg.substring(7, 11)) ?? '';
+  const qPulePos = Math.round((puLeMap.get(puleKeyPI(pnPos)) || 0) * qpPos);
+  const qPuleNeg = Math.round((puLeMap.get(puleKeyPI(pnNeg)) || 0) * qpNeg);
+  return { wo, code, itemAssy, itemBattery, codeBattery, year,
+           pnPos, gridPos, qpPos, qPulePos,
+           pnNeg, gridNeg, qpNeg, qPuleNeg };
+}
+
+/* ── Data loading & computation ── */
+async function loadResumeData() {
+  document.getElementById('loadStatus').textContent = 'Memuat data…';
+  try {
+    const periods = await PiDB.getPeriods();
+    if (!periods.length) {
+      document.getElementById('loadStatus').textContent = 'Belum ada data Produksi Infor.';
+      return;
+    }
+
+    const allRows = (await Promise.all(periods.map(p => PiDB.getData(p)))).flat();
+    const maps    = buildLookupMapsPI();
+
+    /* ── Assembling: SUM qty per year, hanya WO = PKAB / PKAS ── */
+    const assemblingByYear = {};
+    for (const r of allRows) {
+      const wo = String(r.orderNo || '').substring(0, 4);
+      if (wo !== 'PKAB' && wo !== 'PKAS') continue;
+      const year = r.trxDate ? String(r.trxDate).slice(-4) : '';
+      if (!/^\d{4}$/.test(year)) continue;
+      assemblingByYear[year] = (assemblingByYear[year] || 0) + (Number(r.qty) || 0);
+    }
+    for (const y of YEARS) {
+      const v = assemblingByYear[String(y)];
+      if (v !== undefined) fillCell('assembling', y, Math.round(v));
+    }
+
+    /* ── Grid Casting Pos: SUM Qty Plate (+) per year
+          Filter: WO = PKAB/PKAS, Grid Process (+) = "Grid Casting" ── */
+    const gcPosYear = {};
+    for (const r of allRows) {
+      const g = computeGenPiRow(r, maps);
+      if (g.wo !== 'PKAB' && g.wo !== 'PKAS') continue;
+      if (g.gridPos !== 'Grid Casting') continue;
+      if (!/^\d{4}$/.test(g.year)) continue;
+      gcPosYear[g.year] = (gcPosYear[g.year] || 0) + g.qpPos;
+    }
+    for (const y of YEARS) {
+      const v = gcPosYear[String(y)];
+      if (v !== undefined) fillCell('gridCasting_pos', y, Math.round(v));
+    }
+
+    /* ── Grid Casting Neg: SUM Qty Plate (-) per year
+          Filter: WO = PKAB/PKAS, Grid Process (-) = "Grid Casting" ── */
+    const gcNegYear = {};
+    for (const r of allRows) {
+      const g = computeGenPiRow(r, maps);
+      if (g.wo !== 'PKAB' && g.wo !== 'PKAS') continue;
+      if (g.gridNeg !== 'Grid Casting') continue;
+      if (!/^\d{4}$/.test(g.year)) continue;
+      gcNegYear[g.year] = (gcNegYear[g.year] || 0) + g.qpNeg;
+    }
+    for (const y of YEARS) {
+      const v = gcNegYear[String(y)];
+      if (v !== undefined) fillCell('gridCasting_neg', y, Math.round(v));
+    }
+
+    /* ── Grid Casting Total: Pos + Neg ── */
+    for (const y of YEARS) {
+      const pos = gcPosYear[String(y)];
+      const neg = gcNegYear[String(y)];
+      if (pos !== undefined || neg !== undefined) {
+        fillCell('gridCasting_total', y, Math.round((pos || 0) + (neg || 0)));
+      }
+    }
+
+    document.getElementById('loadStatus').textContent =
+      `Data dimuat: ${allRows.length.toLocaleString('id-ID')} record dari ${periods.length} periode.`;
+  } catch (err) {
+    document.getElementById('loadStatus').textContent = `Gagal memuat data: ${err.message}`;
+  }
+}
+
+/* ── Export ── */
+function exportTable() {
+  if (typeof XLSX === 'undefined') { alert('Library XLSX belum dimuat'); return; }
+  const wb = XLSX.utils.table_to_book(document.getElementById('resumeTable'), { sheet:'Resume' });
+  XLSX.writeFile(wb, 'Resume_Produksi.xlsx');
+}
+
+/* ── Init ── */
+async function pageInit() {
+  document.getElementById('topbarMount').innerHTML = BPMS.renderTopbar('Resume');
+  buildTable();
+  await loadResumeData();
+}
+</script>
+</body>
+</html>

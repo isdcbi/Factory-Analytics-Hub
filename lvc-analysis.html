@@ -130,11 +130,13 @@ const MONTHS_ABR = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt',
 
 const LVC_PROCESSES = [
   {
-    key: 'assembling', label: 'Assembling', unit: 'Jam/Bln',
+    key: 'assembling', label: 'Assembling', unit: 'pcs/Bln',
     lines: ['Line 1','Line 2','Line 3','Line 4','Line 5','Line 6','Line 7','Line MCB','Line IB','Line Lithium'],
     qtyLineRange: [1, 7],
     loadType: 'battery',
     loadQtyFrom: 'resumeAMB',
+    installedCapLineRange: [1, 7],
+    capacityNormalLineRange: [1, 7],
   },
   {
     key: 'charging', label: 'Charging', unit: 'Jam/Bln',
@@ -309,12 +311,48 @@ function calcMonthData(period, proc) {
   const workdays = BPMS.getWorkDayCount(period);
 
   let installedCap = 0;
-  for (const line of proc.lines) {
-    installedCap += BPMS.getCapacityHours(period, line);
+  if (proc.installedCapLineRange) {
+    const [cMin, cMax] = proc.installedCapLineRange;
+    const pcRows = state.processCapacity || [];
+    for (let n = cMin; n <= cMax; n++) {
+      const row = pcRows.find(r => r.process === `Line ${n}`);
+      if (!row) continue;
+      const spd = Number(row.speed) || 0;
+      const eff = (Number(row.efficiency) || 0) / 100;
+      const im  = Number(row.installedMachine) || 0;
+      if (!spd || !eff || !im) continue;
+      installedCap += spd * eff * (435 + 405 + 370) * im * workdays;
+    }
+  } else {
+    for (const line of proc.lines) {
+      installedCap += BPMS.getCapacityHours(period, line);
+    }
   }
 
   const nLines = proc.lines.length;
-  const ot2Cap = installedCap + 2 * workdays * nLines;
+  let ot2Cap;
+  if (proc.capacityNormalLineRange) {
+    const [cMin, cMax] = proc.capacityNormalLineRange;
+    const pcRows = state.processCapacity || [];
+    let totalCapDay = 0;
+    for (let n = cMin; n <= cMax; n++) {
+      const lineName = `Line ${n}`;
+      const row = pcRows.find(r => r.process === lineName);
+      if (!row) continue;
+      const spd = Number(row.speed) || 0;
+      const eff = (Number(row.efficiency) || 0) / 100;
+      if (!spd || !eff) continue;
+      const shiftCfg = state.capacity?.[period]?.[lineName] || null;
+      const sOn = s => shiftCfg ? !!shiftCfg[s] : true;
+      const c1 = spd * eff * 435, c2 = spd * eff * 405, c3 = spd * eff * 370;
+      totalCapDay += c1 * (sOn('s1') ? (Number(row.qtyS1) || 0) : 0)
+                   + c2 * (sOn('s2') ? (Number(row.qtyS2) || 0) : 0)
+                   + c3 * (sOn('s3') ? (Number(row.qtyS3) || 0) : 0);
+    }
+    ot2Cap = totalCapDay * workdays;
+  } else {
+    ot2Cap = installedCap + 2 * workdays * nLines;
+  }
   const ot4Cap = installedCap + 4 * workdays * nLines;
 
   return { loadingHours, loadingQty, installedCap, ot2Cap, ot4Cap, workdays };
@@ -363,7 +401,7 @@ function niceMax(raw) {
 // ── SVG Chart + embedded table ─────────────────────────────────────────
 function makeChartSVG(yearData, useQty, loadLabel) {
   const W = 724;
-  const mL = 110, mR = 6, mT = 52, mB = 8;
+  const mL = 155, mR = 6, mT = 52, mB = 8;
   const cW  = W - mL - mR;    // 608
   const cH  = 200 - mT - mB;  // 140
   const ROW_H   = 20;
@@ -460,7 +498,7 @@ function makeChartSVG(yearData, useQty, loadLabel) {
     { label: 'Installed Capacity', isLoad: false,
       sym: { type: 'line', stroke: '#374151', dash: null },
       vals: yearData.map(d => fmtH(d.installedCap)) },
-    { label: 'Setting 2OT',       isLoad: false,
+    { label: 'Setting Capacity Normal', isLoad: false,
       sym: { type: 'line', stroke: '#2563eb', dash: '5,2' },
       vals: yearData.map(d => fmtH(d.ot2Cap)) },
     { label: 'Setting 4OT',       isLoad: false,
@@ -526,7 +564,7 @@ function renderProcessCard(proc, yearData) {
       <div class="proc-stat">
         <div class="proc-stat-label">Σ CAP</div>
         <div class="proc-stat-value">${fmtStat(totalCap)}</div>
-        <div class="proc-stat-sub">Jam</div>
+        <div class="proc-stat-sub">${loadUnit}</div>
       </div>
       <div class="proc-stat">
         <div class="proc-stat-label">AVG UTIL</div>
@@ -581,7 +619,7 @@ function exportExcel() {
     const rows     = [
       ['Loading (Jam)',        ...yearData.map(d => Math.round(d.loadingHours))],
       ['Installed Cap. (Jam)', ...yearData.map(d => Math.round(d.installedCap))],
-      ['Setting 2OT (Jam)',    ...yearData.map(d => Math.round(d.ot2Cap))],
+      ['Setting Capacity Normal (Jam)', ...yearData.map(d => Math.round(d.ot2Cap))],
       ['Setting 4OT (Jam)',    ...yearData.map(d => Math.round(d.ot4Cap))],
       ['Hari Kerja',           ...yearData.map(d => d.workdays)],
     ];

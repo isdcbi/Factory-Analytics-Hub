@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Data Produksi BaaN — Factory Analytics Hub</title>
+  <link rel="stylesheet" href="style.css"/>
+</head>
+<body>
+<div class="app-layout">
+  <div id="sidebarMount"></div>
+
+  <div class="main-content">
+    <div id="topbarMount"></div>
+
+    <div class="page-body">
+      <div class="empty-state" style="margin-top:80px">
+        <div class="empty-icon">🏭</div>
+        <div class="empty-title">Data Produksi BaaN</div>
+        <div class="empty-text">Halaman ini sedang dalam pengembangan.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="shared-components.js"></script>
+<script>
+function pageInit() {
+  document.getElementById('topbarMount').innerHTML = BPMS.renderTopbar('Data Produksi BaaN');
+}
+</script>
+</body>
+</html>
