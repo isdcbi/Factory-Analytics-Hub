@@ -1,7 +1,7 @@
 # Factory Analytics Hub (FAH) — Current State & Activity Log
 
 **Project:** Factory Analytics Hub (FAH) v1.0  
-**Last Updated:** 2026-06-29  
+**Last Updated:** 2026-06-30  
 **Stack:** HTML5 + Vanilla JS + PHP (state.php) + SheetJS
 
 ---
@@ -26,10 +26,19 @@
 | Shared Components | `shared-components.js` | ✅ Selesai |
 | Stylesheet | `style.css` | ✅ Selesai |
 | Backend API | `api/state.php` | ✅ Selesai |
+| Backend API Produksi Infor | `api/produksi-infor.php` | ✅ Selesai |
+| Backend API Orders | `api/orders.php` | ✅ Selesai (baru) |
 
 ---
 
 ## Activity Log
+
+### 2026-06-30
+- **api/orders.php** — API baru untuk Data Order, identik pola dengan `api/produksi-infor.php`. Endpoint: GET (list periods), GET `?period=YYYY-MM` (data), POST `{period, data}` (save), DELETE `?period=YYYY-MM` (hapus). Simpan di `data/orders/YYYY-MM.json`. Direktori dibuat otomatis jika belum ada.
+- **data-produksi-infor.html** — Migrasi ke **server-side JSON** sebagai primary storage. `populatePeriods()` → GET `api/produksi-infor.php`, fallback IndexedDB. `loadPeriodData()` → memory cache → IndexedDB → GET server, save ke IndexedDB. `commitUpload()` → POST server + simpan IndexedDB, toast beda jika offline. `deletePeriod()` → DELETE server + hapus IndexedDB. Data kini tersinkron antar device.
+- **data-order.html** — Migrasi ke **server-side JSON** sebagai primary storage. `pageInit()` → GET `api/orders.php` untuk period list, tiap period: cek IndexedDB dulu lalu fetch server. `commitUpload()` → POST server + simpan IndexedDB. `deletePeriod()` → DELETE server + hapus IndexedDB. `deleteOrder()` → POST server (overwrite) + simpan IndexedDB. Toast beda jika server tidak terjangkau.
+- **shared-components.js** — Grup navigasi diubah: tambah grup **Database** (pindahkan Database PCS + Database Konversi dari LVC). Urutan grup: Database → LVC → Parameter Asumsi.
+- **resume.html** — Kolom WO ditambahkan ke `computeGenPiRow()`. Baris Assembling: SUM Qty Produksi di Generated Data per Year, filter WO = PKAB/PKAS. Baris Grid Casting Pos: SUM Qty Plate (+) filter Grid Process (+) = Grid Casting + WO PKAB/PKAS. Grid Casting Neg: SUM Qty Plate (-) filter Grid Process (-) = Grid Casting + WO PKAB/PKAS. Grid Casting Total = Pos + Neg.
 
 ### 2026-06-29 (3)
 - **resume.html** — Halaman Resume dibangun dari `Tabel Resume.xlsx`. Tabel tahun (2013–2025) sebagai kolom, dan baris-baris proses: Plate/battery, Berat lead/battery, Berat lead/panel, Assembling, Grid Casting (Pos/Neg/Total/Battery), Grid Punching, Ball Mill, Pasting Casting, Pasting Punching, Formation, Asam Sulfat. Data dikosongkan dulu (—). Sticky header + sticky 3 kolom kiri (Proses, Sub, Satuan). Export Excel via SheetJS.

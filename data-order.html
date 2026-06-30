@@ -757,16 +757,26 @@ async function pageInit() {
     if (btn.dataset.tab === 'resume-order') renderResume();
   });
 
-  // Load periods from IndexedDB
+  // Load periods: server (primary) → IndexedDB (fallback)
   BPMS.showLoading();
   try {
-    _orderPeriods = await OrderDB.getPeriods();
-    if (_orderPeriods.length) {
-      await Promise.all(_orderPeriods.map(async p => {
-        _orderCache[p] = await OrderDB.getData(p);
-      }));
-    }
-  } catch(e) { /* IndexedDB tidak tersedia */ }
+    let serverPeriods = null;
+    try {
+      const r = await fetch('api/orders.php', { cache: 'no-store' });
+      if (r.ok) { const j = await r.json(); if (j.ok && Array.isArray(j.periods)) serverPeriods = j.periods; }
+    } catch (_) {}
+
+    _orderPeriods = serverPeriods || (await OrderDB.getPeriods().catch(() => []));
+    await Promise.all(_orderPeriods.map(async p => {
+      try { const c = await OrderDB.getData(p); if (c && c.length) { _orderCache[p] = c; return; } } catch (_) {}
+      if (serverPeriods) {
+        try {
+          const r = await fetch('api/orders.php?period=' + p, { cache: 'no-store' });
+          if (r.ok) { const j = await r.json(); if (j.ok && Array.isArray(j.data)) { _orderCache[p] = j.data; try { await OrderDB.setData(p, j.data); } catch (_) {} } }
+        } catch (_) {}
+      }
+    }));
+  } catch(e) { /* silently handle */ }
   BPMS.hideLoading();
 
   populatePeriods();
@@ -1024,13 +1034,18 @@ async function deletePeriod() {
   if (!currentPeriod) return;
   if (!confirm(`Hapus semua data order periode ${BPMS.formatPeriod(currentPeriod)}?`)) return;
   try {
-    await OrderDB.deleteData(currentPeriod);
+    let serverOk = false;
+    try {
+      const r = await fetch('api/orders.php?period=' + currentPeriod, { method: 'DELETE' });
+      serverOk = r.ok;
+    } catch (_) {}
+    try { await OrderDB.deleteData(currentPeriod); } catch (_) {}
     delete _orderCache[currentPeriod];
     _orderPeriods = _orderPeriods.filter(p => p !== currentPeriod);
     currentPeriod = '';
     populatePeriods();
     renderOrders();
-    BPMS.toast('Periode dihapus', 'info');
+    BPMS.toast(serverOk ? 'Periode dihapus' : 'Periode dihapus lokal (server tidak terjangkau)', serverOk ? 'info' : 'error');
   } catch(err) {
     BPMS.toast('Gagal menghapus: ' + err.message, 'error');
   }
@@ -1142,14 +1157,26 @@ async function commitUpload() {
   if (!pendingData.length || !currentPeriod) return;
   BPMS.showLoading();
   try {
-    await OrderDB.setData(currentPeriod, pendingData);
+    let serverOk = false;
+    try {
+      const r = await fetch('api/orders.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ period: currentPeriod, data: pendingData }),
+      });
+      if (r.ok) { const j = await r.json(); serverOk = j.ok; }
+    } catch (_) {}
+    try { await OrderDB.setData(currentPeriod, pendingData); } catch (_) {}
     _orderCache[currentPeriod] = pendingData;
     if (!_orderPeriods.includes(currentPeriod)) {
       _orderPeriods.push(currentPeriod);
       _orderPeriods.sort().reverse();
     }
     BPMS.hideLoading();
-    BPMS.toast(`${pendingData.length} order disimpan ke ${BPMS.formatPeriod(currentPeriod)}`, 'success');
+    const msg = serverOk
+      ? `${pendingData.length} order disimpan ke ${BPMS.formatPeriod(currentPeriod)}`
+      : `${pendingData.length} order disimpan lokal (server tidak terjangkau)`;
+    BPMS.toast(msg, serverOk ? 'success' : 'error');
     pendingData = [];
     document.getElementById('previewPanel').style.display = 'none';
     populatePeriods();
@@ -1444,7 +1471,14 @@ async function deleteOrder(period, idx) {
   if (!orders || idx < 0) return;
   orders.splice(idx, 1);
   try {
-    await OrderDB.setData(period, orders);
+    try {
+      await fetch('api/orders.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ period, data: orders }),
+      });
+    } catch (_) {}
+    try { await OrderDB.setData(period, orders); } catch (_) {}
     renderOrders();
   } catch(err) {
     BPMS.toast('Gagal menghapus: ' + err.message, 'error');

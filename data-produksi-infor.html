@@ -705,11 +705,26 @@ function parsePeriodFromDate(trxDate) {
   return null;
 }
 
-// Load data satu periode dari IndexedDB → simpan di cache
+// Load data satu periode: memory cache → IndexedDB → server
 async function loadPeriodData(period) {
   if (_piCache[period]) return _piCache[period];
-  _piCache[period] = await PiDB.getData(period);
-  return _piCache[period];
+  try {
+    const cached = await PiDB.getData(period);
+    if (cached && cached.length) { _piCache[period] = cached; return cached; }
+  } catch (_) {}
+  try {
+    const r = await fetch('api/produksi-infor.php?period=' + period, { cache: 'no-store' });
+    if (r.ok) {
+      const j = await r.json();
+      if (j.ok && Array.isArray(j.data)) {
+        _piCache[period] = j.data;
+        try { await PiDB.setData(period, j.data); } catch (_) {}
+        return j.data;
+      }
+    }
+  } catch (_) {}
+  _piCache[period] = [];
+  return [];
 }
 
 // Load semua periode yang belum di-cache
@@ -717,11 +732,18 @@ async function loadAllPeriods() {
   await Promise.all(_piPeriods.filter(p => !_piCache[p]).map(p => loadPeriodData(p)));
 }
 
-// Refresh daftar periode dari IndexedDB → update dropdown
+// Refresh daftar periode: server (primary) → IndexedDB (fallback)
 async function populatePeriods() {
   try {
-    _piPeriods = await PiDB.getPeriods();
-  } catch { _piPeriods = []; }
+    const r = await fetch('api/produksi-infor.php', { cache: 'no-store' });
+    if (r.ok) {
+      const j = await r.json();
+      if (j.ok && Array.isArray(j.periods)) { _piPeriods = j.periods; }
+      else throw new Error('bad response');
+    } else { throw new Error('server error'); }
+  } catch (_) {
+    try { _piPeriods = await PiDB.getPeriods(); } catch { _piPeriods = []; }
+  }
 
   const sel     = document.getElementById('periodSelect');
   const current = sel.value;
@@ -739,13 +761,18 @@ async function deletePeriod() {
   if (!currentPeriod) { BPMS.toast('Pilih periode terlebih dahulu', 'error'); return; }
   if (!confirm(`Hapus semua data produksi periode ${BPMS.formatPeriod(currentPeriod)}?`)) return;
   try {
-    await PiDB.deleteData(currentPeriod);
+    let serverOk = false;
+    try {
+      const r = await fetch('api/produksi-infor.php?period=' + currentPeriod, { method: 'DELETE' });
+      serverOk = r.ok;
+    } catch (_) {}
+    try { await PiDB.deleteData(currentPeriod); } catch (_) {}
     delete _piCache[currentPeriod];
     _piPeriods = _piPeriods.filter(p => p !== currentPeriod);
     currentPeriod = '';
     await populatePeriods();
     renderTable();
-    BPMS.toast('Periode dihapus', 'info');
+    BPMS.toast(serverOk ? 'Periode dihapus' : 'Periode dihapus lokal (server tidak terjangkau)', serverOk ? 'info' : 'error');
   } catch(err) {
     BPMS.toast('Gagal menghapus: ' + err.message, 'error');
   }
@@ -865,10 +892,21 @@ async function commitUpload() {
   BPMS.showLoading();
   let totalSaved    = 0;
   const savedLabels = [];
+  let offlineOnly   = false;
 
   try {
     for (const [period, rows] of validPeriods) {
-      await PiDB.setData(period, rows);
+      let serverOk = false;
+      try {
+        const r = await fetch('api/produksi-infor.php', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ period, data: rows }),
+        });
+        if (r.ok) { const j = await r.json(); serverOk = j.ok; }
+      } catch (_) {}
+      if (!serverOk) offlineOnly = true;
+      try { await PiDB.setData(period, rows); } catch (_) {}
       _piCache[period] = rows;
       if (!_piPeriods.includes(period)) _piPeriods.push(period);
       totalSaved += rows.length;
@@ -876,7 +914,7 @@ async function commitUpload() {
     }
   } catch(err) {
     BPMS.hideLoading();
-    BPMS.toast('Gagal menyimpan ke database: ' + err.message, 'error');
+    BPMS.toast('Gagal menyimpan: ' + err.message, 'error');
     return;
   }
 
@@ -887,7 +925,11 @@ async function commitUpload() {
     return;
   }
 
-  BPMS.toast(`${totalSaved.toLocaleString()} record disimpan ke: ${savedLabels.join(', ')}`, 'success');
+  if (offlineOnly) {
+    BPMS.toast(`${totalSaved.toLocaleString()} record disimpan lokal (server tidak terjangkau — upload ulang saat online): ${savedLabels.join(', ')}`, 'error');
+  } else {
+    BPMS.toast(`${totalSaved.toLocaleString()} record disimpan ke: ${savedLabels.join(', ')}`, 'success');
+  }
   pendingGroups = new Map();
   document.getElementById('previewPanel').style.display = 'none';
 
