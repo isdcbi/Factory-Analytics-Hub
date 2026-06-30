@@ -665,6 +665,63 @@
 
 <script src="shared-components.js"></script>
 <script>
+// ── IndexedDB storage (sama seperti Data Produksi Infor) ──────────
+const OrderDB = (() => {
+  const DB_NAME = 'bpms_orders';
+  const DB_VER  = 1;
+  const STORE   = 'periods';
+
+  function open() {
+    return new Promise((resolve, reject) => {
+      const req = indexedDB.open(DB_NAME, DB_VER);
+      req.onupgradeneeded = e => e.target.result.createObjectStore(STORE);
+      req.onsuccess       = e => resolve(e.target.result);
+      req.onerror         = e => reject(e.target.error);
+    });
+  }
+
+  async function getPeriods() {
+    const db = await open();
+    return new Promise((resolve, reject) => {
+      const req = db.transaction(STORE, 'readonly').objectStore(STORE).getAllKeys();
+      req.onsuccess = () => resolve([...req.result].sort().reverse());
+      req.onerror   = () => reject(req.error);
+    });
+  }
+
+  async function getData(period) {
+    const db = await open();
+    return new Promise((resolve, reject) => {
+      const req = db.transaction(STORE, 'readonly').objectStore(STORE).get(period);
+      req.onsuccess = () => resolve(req.result || []);
+      req.onerror   = () => reject(req.error);
+    });
+  }
+
+  async function setData(period, rows) {
+    const db = await open();
+    return new Promise((resolve, reject) => {
+      const req = db.transaction(STORE, 'readwrite').objectStore(STORE).put(rows, period);
+      req.onsuccess = () => resolve(true);
+      req.onerror   = () => reject(req.error);
+    });
+  }
+
+  async function deleteData(period) {
+    const db = await open();
+    return new Promise((resolve, reject) => {
+      const req = db.transaction(STORE, 'readwrite').objectStore(STORE).delete(period);
+      req.onsuccess = () => resolve(true);
+      req.onerror   = () => reject(req.error);
+    });
+  }
+
+  return { getPeriods, getData, setData, deleteData };
+})();
+
+let _orderCache   = {};   // period → rows[] (in-memory)
+let _orderPeriods = [];   // daftar periode tersedia
+
 let currentPeriod    = '';
 let pendingData      = [];
 let orderColFilters  = {};   // key -> Set of selected values
@@ -672,7 +729,19 @@ let activeOrderKey   = null;
 let genColFilters    = {};   // key -> Set of selected values
 let activeGenKey     = null;
 
-function pageInit() {
+// Kumpulkan semua order dari cache (mirip getAllRows di produksi-infor)
+function getAllOrders() {
+  if (currentPeriod) {
+    return (_orderCache[currentPeriod] || []).map(r => ({ ...r, _period: currentPeriod }));
+  }
+  const all = [];
+  [..._orderPeriods].sort().reverse().forEach(p => {
+    (_orderCache[p] || []).forEach(r => all.push({ ...r, _period: p }));
+  });
+  return all;
+}
+
+async function pageInit() {
   document.getElementById('topbarMount').innerHTML = BPMS.renderTopbar('Data Order');
 
   // Tab switching
@@ -688,6 +757,18 @@ function pageInit() {
     if (btn.dataset.tab === 'resume-order') renderResume();
   });
 
+  // Load periods from IndexedDB
+  BPMS.showLoading();
+  try {
+    _orderPeriods = await OrderDB.getPeriods();
+    if (_orderPeriods.length) {
+      await Promise.all(_orderPeriods.map(async p => {
+        _orderCache[p] = await OrderDB.getData(p);
+      }));
+    }
+  } catch(e) { /* IndexedDB tidak tersedia */ }
+  BPMS.hideLoading();
+
   populatePeriods();
 
   const sel = document.getElementById('periodSelect');
@@ -699,11 +780,9 @@ function pageInit() {
     if (activeTab === 'resume-order')  renderResume();
   });
 
-  const orderPeriods = Object.keys(BPMS.getState().orders || {}).sort().reverse();
-  const autoSelect   = orderPeriods[0] || '';
-  if (autoSelect) {
-    sel.value     = autoSelect;
-    currentPeriod = autoSelect;
+  if (_orderPeriods.length) {
+    currentPeriod = _orderPeriods[0];
+    sel.value     = currentPeriod;
   }
   renderOrders();
   renderResume();
@@ -790,15 +869,7 @@ function pageInit() {
 // ── PN Not Found Modal ────────────────────────────────────────────
 
 function openPNNotFoundModal() {
-  const state = BPMS.getState();
-  let allOrders = [];
-  if (!currentPeriod) {
-    BPMS.getPeriods().forEach(p => {
-      (state.orders?.[p] || []).forEach(r => allOrders.push({ ...r, _period: p }));
-    });
-  } else {
-    allOrders = (state.orders?.[currentPeriod] || []).map(r => ({ ...r, _period: currentPeriod }));
-  }
+  let allOrders = getAllOrders();
 
   const invalid = allOrders.filter(r => (r.item || '').length < 27);
 
@@ -835,15 +906,7 @@ function closePNNotFoundModal() {
 // ── Unmapped Modal ────────────────────────────────────────────────
 
 function openUnmappedModal() {
-  const state = BPMS.getState();
-  let allOrders = [];
-  if (!currentPeriod) {
-    BPMS.getPeriods().forEach(p => {
-      (state.orders?.[p] || []).forEach(r => allOrders.push({ ...r, _period: p }));
-    });
-  } else {
-    allOrders = (state.orders?.[currentPeriod] || []).map(r => ({ ...r, _period: currentPeriod }));
-  }
+  let allOrders = getAllOrders();
 
   // Compute PCS lines jika belum
   allOrders.forEach(r => {
@@ -913,12 +976,14 @@ function getModalPeriod() {
 }
 
 function applyModalPeriod(p) {
-  // Pastikan periode ada di state
-  const state = BPMS.getState();
-  if (!state.orders[p]) {
-    state.orders[p] = [];
+  if (!_orderCache[p]) {
+    _orderCache[p] = [];
     BPMS.initCalendarForPeriod(p);
     BPMS.initCapacityForPeriod(p);
+  }
+  if (!_orderPeriods.includes(p)) {
+    _orderPeriods.push(p);
+    _orderPeriods.sort().reverse();
   }
   currentPeriod = p;
   populatePeriods();
@@ -929,7 +994,7 @@ function populatePeriods() {
   const sel     = document.getElementById('periodSelect');
   const current = sel.value;
   sel.innerHTML = '<option value="">-- Semua Periode --</option>';
-  BPMS.getPeriods().forEach(p => {
+  _orderPeriods.forEach(p => {
     const opt = document.createElement('option');
     opt.value       = p;
     opt.textContent = BPMS.formatPeriod(p);
@@ -940,27 +1005,35 @@ function populatePeriods() {
 
 function addPeriod(val) {
   if (!val) return;
-  const state = BPMS.getState();
-  if (!state.orders[val]) state.orders[val] = [];
-  BPMS.initCalendarForPeriod(val);
-  BPMS.initCapacityForPeriod(val);
-  BPMS.saveState();
+  if (!_orderCache[val]) {
+    _orderCache[val] = [];
+    BPMS.initCalendarForPeriod(val);
+    BPMS.initCapacityForPeriod(val);
+  }
+  if (!_orderPeriods.includes(val)) {
+    _orderPeriods.push(val);
+    _orderPeriods.sort().reverse();
+  }
   populatePeriods();
   document.getElementById('periodSelect').value = val;
   currentPeriod = val;
   renderOrders();
 }
 
-function deletePeriod() {
+async function deletePeriod() {
   if (!currentPeriod) return;
   if (!confirm(`Hapus semua data order periode ${BPMS.formatPeriod(currentPeriod)}?`)) return;
-  const state = BPMS.getState();
-  delete state.orders[currentPeriod];
-  currentPeriod = '';
-  BPMS.saveState();
-  populatePeriods();
-  renderOrders();
-  BPMS.toast('Periode dihapus', 'info');
+  try {
+    await OrderDB.deleteData(currentPeriod);
+    delete _orderCache[currentPeriod];
+    _orderPeriods = _orderPeriods.filter(p => p !== currentPeriod);
+    currentPeriod = '';
+    populatePeriods();
+    renderOrders();
+    BPMS.toast('Periode dihapus', 'info');
+  } catch(err) {
+    BPMS.toast('Gagal menghapus: ' + err.message, 'error');
+  }
 }
 
 // ── File Import ──────────────────────────────────────────────────
@@ -1065,17 +1138,28 @@ function showPreview(data) {
   document.getElementById('previewPanel').style.display = '';
 }
 
-function commitUpload() {
+async function commitUpload() {
   if (!pendingData.length || !currentPeriod) return;
-  BPMS.getState().orders[currentPeriod] = pendingData;
-  BPMS.saveState().then(() => {
+  BPMS.showLoading();
+  try {
+    await OrderDB.setData(currentPeriod, pendingData);
+    _orderCache[currentPeriod] = pendingData;
+    if (!_orderPeriods.includes(currentPeriod)) {
+      _orderPeriods.push(currentPeriod);
+      _orderPeriods.sort().reverse();
+    }
+    BPMS.hideLoading();
     BPMS.toast(`${pendingData.length} order disimpan ke ${BPMS.formatPeriod(currentPeriod)}`, 'success');
     pendingData = [];
     document.getElementById('previewPanel').style.display = 'none';
+    populatePeriods();
     renderOrders();
     const activeTab = document.querySelector('.do-tab.active')?.dataset.tab;
     if (activeTab === 'generated') renderGenerated();
-  });
+  } catch(err) {
+    BPMS.hideLoading();
+    BPMS.toast('Gagal menyimpan: ' + err.message, 'error');
+  }
 }
 
 // ── Column Filter ────────────────────────────────────────────────
@@ -1101,18 +1185,8 @@ function getOrderValue(row, key) {
 
 function openOrderFilter(key, triggerEl) {
   activeOrderKey = key;
-  const state = BPMS.getState();
-
-  // Collect all rows for this period selection
-  let allOrders = [];
-  if (!currentPeriod) {
-    BPMS.getPeriods().forEach(p => {
-      (state.orders?.[p] || []).forEach(r => allOrders.push({ ...r, _period: p }));
-    });
-  } else {
-    allOrders = (state.orders?.[currentPeriod] || []).map(r => ({ ...r, _period: currentPeriod }));
-  }
   // Ensure PCS lines are computed on this local copy
+  let allOrders = getAllOrders();
   allOrders.forEach(r => {
     if (r._linesComputed) return;
     const p = r._parsed || {};
@@ -1184,16 +1258,7 @@ function getGenCellValue(row, key, g) {
 
 function openGenFilter(key, triggerEl) {
   activeGenKey = key;
-  const state = BPMS.getState();
-
-  let allOrders = [];
-  if (!currentPeriod) {
-    BPMS.getPeriods().forEach(p => {
-      (state.orders?.[p] || []).forEach(r => allOrders.push({ ...r, _period: p }));
-    });
-  } else {
-    allOrders = (state.orders?.[currentPeriod] || []).map(r => ({ ...r, _period: currentPeriod }));
-  }
+  let allOrders = getAllOrders();
   allOrders.forEach(r => {
     if (r._linesComputed) return;
     const p = r._parsed || {};
@@ -1258,19 +1323,7 @@ function closeGenFilter() {
 function renderOrders() {
   const body  = document.getElementById('ordersBody');
   const q     = document.getElementById('searchInput').value.toLowerCase();
-  const state = BPMS.getState();
-
-  // Kumpulkan order: semua periode atau periode terpilih
-  let allOrders;
-  if (!currentPeriod) {
-    // Semua periode — gabungkan dengan info periode
-    allOrders = [];
-    BPMS.getPeriods().forEach(p => {
-      (state.orders?.[p] || []).forEach(r => allOrders.push({ ...r, _period: p }));
-    });
-  } else {
-    allOrders = (state.orders?.[currentPeriod] || []).map(r => ({ ...r, _period: currentPeriod }));
-  }
+  let allOrders = getAllOrders();
 
   // Pre-compute PCS lookup sekali per row
   allOrders.forEach(r => {
@@ -1360,9 +1413,6 @@ function renderOrders() {
 
   body.innerHTML = filtered.map((r, i) => {
     const p   = r._parsed || {};
-    const per = r._period;
-    const periodOrders = state.orders?.[per] || [];
-    const idx = periodOrders.indexOf(periodOrders.find(o => o === r || (o.item === r.item && o.so === r.so && o.qty === r.qty)));
 
     const l1Badge = r._line1 ? `<span class="badge badge-neutral">${r._line1}</span>` : '<span class="text-muted">—</span>';
     const l2Badge = r._line2 ? `<span class="badge badge-neutral">${r._line2}</span>` : '<span class="text-muted">—</span>';
@@ -1389,12 +1439,16 @@ function renderOrders() {
   }).join('');
 }
 
-function deleteOrder(period, idx) {
-  const orders = BPMS.getState().orders?.[period];
+async function deleteOrder(period, idx) {
+  const orders = _orderCache[period];
   if (!orders || idx < 0) return;
   orders.splice(idx, 1);
-  BPMS.saveState();
-  renderOrders();
+  try {
+    await OrderDB.setData(period, orders);
+    renderOrders();
+  } catch(err) {
+    BPMS.toast('Gagal menghapus: ' + err.message, 'error');
+  }
 }
 
 // ── Generated Data Order ──────────────────────────────────────────
@@ -1507,19 +1561,9 @@ function computeGenRow(r, maps) {
 }
 
 function renderGenerated() {
-  const state = BPMS.getState();
   const body  = document.getElementById('genBody');
   const q     = document.getElementById('genSearch').value.toLowerCase();
-
-  // Collect orders
-  let allOrders = [];
-  if (!currentPeriod) {
-    BPMS.getPeriods().forEach(p => {
-      (state.orders?.[p] || []).forEach(r => allOrders.push({ ...r, _period: p }));
-    });
-  } else {
-    allOrders = (state.orders?.[currentPeriod] || []).map(r => ({ ...r, _period: currentPeriod }));
-  }
+  let allOrders = getAllOrders();
 
   // Ensure PCS lines computed
   allOrders.forEach(r => {
@@ -1595,15 +1639,7 @@ function renderGenerated() {
 }
 
 function getExportOrders() {
-  const state = BPMS.getState();
-  if (currentPeriod) {
-    return (state.orders?.[currentPeriod] || []).map(r => ({ ...r, _period: currentPeriod }));
-  }
-  const all = [];
-  BPMS.getPeriods().forEach(p => {
-    (state.orders?.[p] || []).forEach(r => all.push({ ...r, _period: p }));
-  });
-  return all;
+  return getAllOrders();
 }
 
 function exportRaw() {
@@ -1793,15 +1829,7 @@ function buildResumeGroups() {
     ? ((state.resumeMB || {})[currentPeriod] || {})
     : {};
 
-  // Kumpulkan order sesuai periode terpilih
-  let allOrders = [];
-  if (!currentPeriod) {
-    BPMS.getPeriods().forEach(p => {
-      (state.orders?.[p] || []).forEach(r => allOrders.push(r));
-    });
-  } else {
-    allOrders = state.orders?.[currentPeriod] || [];
-  }
+  const allOrders = getAllOrders();
   if (!allOrders.length) return [];
 
   // SUMIF per Sold To berdasarkan kolom Dry DUC Wet (D / U / W / P→Lithium)

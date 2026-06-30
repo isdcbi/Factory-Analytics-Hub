@@ -39,13 +39,8 @@ const BPMS = (() => {
 
   const NAV_GROUPS = [
     {
-      label: 'LVC',
+      label: 'Database',
       items: [
-        {
-          href: 'dashboard.html',
-          label: 'Dashboard',
-          icon: `<svg viewBox="0 0 16 16" fill="currentColor" class="nav-icon"><rect x="1" y="1" width="6" height="7" rx="1"/><rect x="9" y="1" width="6" height="4" rx="1"/><rect x="1" y="10" width="6" height="5" rx="1"/><rect x="9" y="7" width="6" height="8" rx="1"/></svg>`,
-        },
         {
           href: 'database-pcs.html',
           label: 'Database PCS',
@@ -55,6 +50,16 @@ const BPMS = (() => {
           href: 'database-konversi.html',
           label: 'Database Konversi',
           icon: `<svg viewBox="0 0 16 16" fill="currentColor" class="nav-icon"><path d="M2 3h5v4H2V3zm7 0h5v4H9V3zm-7 6h5v4H2V9zm7 0h5v4H9V9z" opacity=".25"/><path d="M2 3h5v4H2V3zm7 0h5v4H9V3zm-7 6h5v4H2V9zm7 0h5v4H9V9z" fill="none" stroke="currentColor" stroke-width="1.2"/><path d="M7 5h2M7 11h2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>`,
+        },
+      ],
+    },
+    {
+      label: 'LVC',
+      items: [
+        {
+          href: 'dashboard.html',
+          label: 'Dashboard',
+          icon: `<svg viewBox="0 0 16 16" fill="currentColor" class="nav-icon"><rect x="1" y="1" width="6" height="7" rx="1"/><rect x="9" y="1" width="6" height="4" rx="1"/><rect x="1" y="10" width="6" height="5" rx="1"/><rect x="9" y="7" width="6" height="8" rx="1"/></svg>`,
         },
         {
           href: 'data-order.html',
