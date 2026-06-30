@@ -784,10 +784,10 @@ async function pageInit() {
   const sel = document.getElementById('periodSelect');
   sel.addEventListener('change', () => {
     currentPeriod = sel.value;
+    renderOrders();  // selalu update stat cards
     const activeTab = document.querySelector('.do-tab.active')?.dataset.tab;
-    if (activeTab === 'data-order')    renderOrders();
-    if (activeTab === 'generated')     renderGenerated();
-    if (activeTab === 'resume-order')  renderResume();
+    if (activeTab === 'generated')    renderGenerated();
+    if (activeTab === 'resume-order') renderResume();
   });
 
   if (_orderPeriods.length) {

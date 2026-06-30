@@ -162,6 +162,7 @@
             Upload Data Produksi
           </button>
           <button class="btn btn-danger btn-sm" id="deletePeriodBtn">Hapus Periode</button>
+          <button class="btn btn-danger btn-sm" id="deleteAllBtn" style="display:none">Hapus Semua Periode</button>
         </div>
       </div>
 
@@ -530,6 +531,7 @@ async function pageInit() {
   const sel = document.getElementById('periodSelect');
   sel.addEventListener('change', async () => {
     currentPeriod = sel.value;
+    updateDeleteButtons();
     BPMS.showLoading();
     try {
       if (currentPeriod) {
@@ -596,6 +598,7 @@ async function pageInit() {
   });
   document.getElementById('commitUpload').addEventListener('click', commitUpload);
   document.getElementById('deletePeriodBtn').addEventListener('click', deletePeriod);
+  document.getElementById('deleteAllBtn').addEventListener('click', deleteAllPeriods);
   document.getElementById('searchInput').addEventListener('input', renderTable);
   document.getElementById('exportRawBtn').addEventListener('click', exportRaw);
   document.getElementById('exportGenBtn').addEventListener('click', exportGenerated);
@@ -755,6 +758,20 @@ async function populatePeriods() {
     sel.appendChild(opt);
   });
   if (current && _piPeriods.includes(current)) sel.value = current;
+  updateDeleteButtons();
+}
+
+function updateDeleteButtons() {
+  const single = document.getElementById('deletePeriodBtn');
+  const all    = document.getElementById('deleteAllBtn');
+  if (!single || !all) return;
+  if (currentPeriod) {
+    single.style.display = '';
+    all.style.display    = 'none';
+  } else {
+    single.style.display = 'none';
+    all.style.display    = _piPeriods.length ? '' : 'none';
+  }
 }
 
 async function deletePeriod() {
@@ -776,6 +793,35 @@ async function deletePeriod() {
   } catch(err) {
     BPMS.toast('Gagal menghapus: ' + err.message, 'error');
   }
+}
+
+async function deleteAllPeriods() {
+  if (!_piPeriods.length) { BPMS.toast('Tidak ada periode untuk dihapus', 'error'); return; }
+  const n = _piPeriods.length;
+  if (!confirm(`Hapus semua ${n} periode data produksi?\nTindakan ini tidak dapat dibatalkan.`)) return;
+  BPMS.showLoading();
+  let allServerOk = true;
+  try {
+    await Promise.all(_piPeriods.map(async p => {
+      try {
+        const r = await fetch('api/produksi-infor.php?period=' + p, { method: 'DELETE' });
+        if (!r.ok) allServerOk = false;
+      } catch (_) { allServerOk = false; }
+      try { await PiDB.deleteData(p); } catch (_) {}
+    }));
+  } catch (_) {}
+  _piCache     = {};
+  _piPeriods   = [];
+  currentPeriod = '';
+  BPMS.hideLoading();
+  await populatePeriods();
+  renderTable();
+  BPMS.toast(
+    allServerOk
+      ? `${n} periode dihapus`
+      : `${n} periode dihapus lokal (server tidak terjangkau)`,
+    allServerOk ? 'info' : 'error'
+  );
 }
 
 // ── File Import ───────────────────────────────────────────────────

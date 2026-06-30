@@ -22,12 +22,13 @@
 | PA — Dashboard | `pa-dashboard.html` | 🔲 Stub (Parameter Asumsi) |
 | PA — Resume | `resume.html` | 🔶 Tabel struktur selesai (data kosong) |
 | PA — Data Produksi Infor | `data-produksi-infor.html` | ✅ Selesai (upload Excel, tab Data + Summary, filter, export) |
-| PA — Data Produksi BaaN | `data-produksi-baan.html` | 🔲 Stub (Parameter Asumsi) |
+| PA — Data Produksi BaaN | `data-produksi-baan.html` | ✅ Selesai (struktur identik dengan Infor, siap disesuaikan) |
 | Shared Components | `shared-components.js` | ✅ Selesai |
 | Stylesheet | `style.css` | ✅ Selesai |
 | Backend API | `api/state.php` | ✅ Selesai |
 | Backend API Produksi Infor | `api/produksi-infor.php` | ✅ Selesai |
 | Backend API Orders | `api/orders.php` | ✅ Selesai (baru) |
+| Backend API Produksi BaaN | `api/produksi-baan.php` | ✅ Selesai (baru) |
 
 ---
 
@@ -39,6 +40,13 @@
 - **data-order.html** — Migrasi ke **server-side JSON** sebagai primary storage. `pageInit()` → GET `api/orders.php` untuk period list, tiap period: cek IndexedDB dulu lalu fetch server. `commitUpload()` → POST server + simpan IndexedDB. `deletePeriod()` → DELETE server + hapus IndexedDB. `deleteOrder()` → POST server (overwrite) + simpan IndexedDB. Toast beda jika server tidak terjangkau.
 - **shared-components.js** — Grup navigasi diubah: tambah grup **Database** (pindahkan Database PCS + Database Konversi dari LVC). Urutan grup: Database → LVC → Parameter Asumsi.
 - **resume.html** — Kolom WO ditambahkan ke `computeGenPiRow()`. Baris Assembling: SUM Qty Produksi di Generated Data per Year, filter WO = PKAB/PKAS. Baris Grid Casting Pos: SUM Qty Plate (+) filter Grid Process (+) = Grid Casting + WO PKAB/PKAS. Grid Casting Neg: SUM Qty Plate (-) filter Grid Process (-) = Grid Casting + WO PKAB/PKAS. Grid Casting Total = Pos + Neg.
+
+### 2026-06-30 (3)
+- **resume.html** — Fix: data berbeda antar device karena `loadResumeData()` hanya membaca IndexedDB (device-local). Ditambahkan `PiDB.setData()` dan logika server-first: periode diambil dari `api/produksi-infor.php`, tiap periode cek IndexedDB dulu, jika kosong fetch dari server lalu cache ke IndexedDB. Sekarang semua device mendapat data yang sama dari server.
+
+### 2026-06-30 (2)
+- **data-produksi-baan.html** — Halaman penuh dibangun (menggantikan stub). Struktur identik dengan `data-produksi-infor.html`: 3 tab (Data Produksi, Generated Data Produksi BaaN, Summary per Line), upload Excel dengan deteksi periode otomatis, filter kolom, stat cards, chunked rendering, export Raw/Generated/Summary. IndexedDB: `bpms_produksi_baan`. Server API: `api/produksi-baan.php`. Kolom Generated sama dengan Infor (shared logic: `computeGenPiRow`, `buildLookupMapsPI`). Siap disesuaikan per kebutuhan BaaN.
+- **api/produksi-baan.php** — API baru, identik pola dengan `api/produksi-infor.php`. Simpan di `data/produksi-baan/YYYY-MM.json`.
 
 ### 2026-06-29 (3)
 - **resume.html** — Halaman Resume dibangun dari `Tabel Resume.xlsx`. Tabel tahun (2013–2025) sebagai kolom, dan baris-baris proses: Plate/battery, Berat lead/battery, Berat lead/panel, Assembling, Grid Casting (Pos/Neg/Total/Battery), Grid Punching, Ball Mill, Pasting Casting, Pasting Punching, Formation, Asam Sulfat. Data dikosongkan dulu (—). Sticky header + sticky 3 kolom kiri (Proses, Sub, Satuan). Export Excel via SheetJS.

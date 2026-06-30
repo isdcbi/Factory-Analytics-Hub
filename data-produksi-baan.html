@@ -5,28 +5,1435 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Data Produksi BaaN — Factory Analytics Hub</title>
   <link rel="stylesheet" href="style.css"/>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <style>
+    /* ── Main table ── */
+    .pi-table-wrap {
+      overflow: hidden;
+      height: calc(100vh - 310px);
+    }
+    .pi-table-wrap .table-scroll { height: 100%; overflow: auto; }
+
+    #piTable {
+      font-size: 12px;
+      table-layout: auto;
+      width: max-content;
+      min-width: 100%;
+    }
+    #piTable th, #piTable td { padding: 5px 10px; white-space: nowrap; }
+    #piTable thead th {
+      font-size: 11px;
+      font-weight: 600;
+      background: var(--bg-2);
+      position: sticky;
+      top: 0;
+      z-index: 3;
+      box-shadow: 0 2px 4px -1px rgba(0,0,0,0.08);
+    }
+    #piTable td.td-item  { font-family: monospace; font-size: 11px; }
+    #piTable td.td-qty   { text-align: right; font-weight: 600; }
+    #piTable td.td-muted { color: var(--text-4); font-size: 11px; }
+
+    #genTable {
+      font-size: 12px;
+      table-layout: auto;
+      width: max-content;
+      min-width: 100%;
+    }
+    #genTable th, #genTable td { padding: 5px 10px; white-space: nowrap; }
+    #genTable thead th {
+      font-size: 11px;
+      font-weight: 600;
+      background: var(--bg-2);
+      position: sticky;
+      top: 0;
+      z-index: 3;
+      box-shadow: 0 2px 4px -1px rgba(0,0,0,0.08);
+    }
+    #genTable thead th.g-num { text-align: right; }
+    #genTable td.g-item  { font-family: monospace; font-size: 11px; }
+    #genTable td.g-qty   { text-align: right; font-weight: 600; font-variant-numeric: tabular-nums; }
+    #genTable td.g-muted { color: var(--text-4); font-size: 11px; }
+
+    /* Preview table */
+    #previewTable {
+      font-size: 12px;
+      table-layout: auto;
+      width: max-content;
+      min-width: 100%;
+    }
+    #previewTable th, #previewTable td { padding: 5px 10px; white-space: nowrap; }
+    #previewTable thead th { font-size: 11px; background: var(--bg-2); }
+    #previewTable td.td-item { font-family: monospace; font-size: 11px; }
+    #previewTable td.td-qty  { text-align: right; font-weight: 600; }
+
+    /* Summary table */
+    .sum-table-wrap { overflow-x: auto; }
+    #sumTable {
+      font-size: 12px;
+      table-layout: auto;
+      width: 100%;
+      min-width: 400px;
+      border-collapse: collapse;
+    }
+    #sumTable th, #sumTable td {
+      padding: 6px 12px;
+      border: 1px solid #cbd5e1;
+      white-space: nowrap;
+    }
+    #sumTable thead th {
+      background: var(--accent);
+      color: #fff;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      position: sticky;
+      top: 0;
+      z-index: 3;
+      border-color: rgba(255,255,255,.2);
+    }
+    #sumTable thead th.s-num { text-align: right; }
+    #sumTable td.s-num { text-align: right; font-variant-numeric: tabular-nums; }
+    #sumTable tr.s-total td {
+      background: #1e3a5f;
+      color: #fff;
+      font-weight: 700;
+      font-size: 11px;
+    }
+
+    /* Tab Nav */
+    .pi-tabs {
+      display: flex;
+      gap: 2px;
+      border-bottom: 2px solid var(--border-solid2);
+      margin-bottom: 20px;
+    }
+    .pi-tab {
+      padding: 8px 18px;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-3);
+      cursor: pointer;
+      border: none;
+      background: none;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -2px;
+      border-radius: 6px 6px 0 0;
+      transition: color var(--transition), background var(--transition), border-color var(--transition);
+      white-space: nowrap;
+    }
+    .pi-tab:hover  { color: var(--text-1); background: var(--bg-2); }
+    .pi-tab.active { color: var(--accent); border-bottom-color: var(--accent); background: rgba(94,106,210,.06); }
+    .pi-panel { display: none; }
+    .pi-panel.active { display: block; }
+
+    /* Column filter */
+    .th-filter-pi { cursor: pointer; display: inline-flex; align-items: center; gap: 3px; }
+    .filter-icon-pi { font-size: 9px; opacity: .5; transition: opacity .15s; }
+    .filter-icon-pi.active { opacity: 1; color: var(--accent); }
+    .th-filter-pi:hover .filter-icon-pi { opacity: 1; }
+    #piFilterDropdown { max-width: 360px; max-height: 300px; }
+    #piFilterDropdown .filter-opt { white-space: nowrap; }
+    #piFilterDropdown .filter-opt span { overflow: hidden; text-overflow: ellipsis; max-width: 300px; display: block; }
+  </style>
 </head>
 <body>
 <div class="app-layout">
   <div id="sidebarMount"></div>
-
   <div class="main-content">
     <div id="topbarMount"></div>
-
     <div class="page-body">
-      <div class="empty-state" style="margin-top:80px">
-        <div class="empty-icon">🏭</div>
-        <div class="empty-title">Data Produksi BaaN</div>
-        <div class="empty-text">Halaman ini sedang dalam pengembangan.</div>
+
+      <!-- Action Bar -->
+      <div class="flex items-center gap-3 mb-6 flex-wrap">
+        <div class="period-bar" style="margin-bottom:0">
+          <span class="period-label">Periode:</span>
+          <select id="periodSelect" class="form-control" style="width:auto">
+            <option value="">— Pilih Periode —</option>
+          </select>
+        </div>
+        <div class="ml-auto flex gap-2">
+          <button class="btn btn-ghost btn-sm" id="uploadBtn">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+              <polyline points="17 8 12 3 7 8"/>
+              <line x1="12" y1="3" x2="12" y2="15"/>
+            </svg>
+            Upload Data Produksi
+          </button>
+          <button class="btn btn-danger btn-sm" id="deletePeriodBtn">Hapus Periode</button>
+        </div>
       </div>
+
+      <input type="file" id="fileInput" accept=".xlsx,.xls" style="display:none"/>
+
+      <!-- Preview panel -->
+      <div id="previewPanel" style="display:none" class="card mb-6">
+        <div class="card-header">
+          <span class="card-title">Preview Data Upload</span>
+          <div class="flex gap-2">
+            <button class="btn btn-ghost btn-sm" id="cancelUpload">Batal</button>
+            <button class="btn btn-primary btn-sm" id="commitUpload">✓ Simpan ke Periode</button>
+          </div>
+        </div>
+        <div id="previewStats" class="flex gap-4 mb-4 text-sm text-muted"></div>
+        <div class="table-wrap">
+          <div class="table-scroll">
+            <table id="previewTable">
+              <thead>
+                <tr>
+                  <th>No</th>
+                  <th>Trx. Date</th>
+                  <th>Trx. Time</th>
+                  <th>WH</th>
+                  <th>Trx Number</th>
+                  <th>Order No</th>
+                  <th>Transaction Type</th>
+                  <th>Line</th>
+                  <th>Item</th>
+                  <th>Item Descriptions</th>
+                  <th>Lot No</th>
+                  <th>Model</th>
+                  <th>Qty</th>
+                  <th>Information</th>
+                  <th>User</th>
+                  <th>ResCode</th>
+                </tr>
+              </thead>
+              <tbody id="previewBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Stats -->
+      <div class="stats-grid mb-4">
+        <div class="stat-card">
+          <div class="stat-label">Total Record</div>
+          <div class="stat-value" id="statTotal">—</div>
+          <div class="stat-sub">Baris transaksi</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Total Qty</div>
+          <div class="stat-value" id="statQty">—</div>
+          <div class="stat-sub">Unit produksi</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Line Aktif</div>
+          <div class="stat-value" id="statLines">—</div>
+          <div class="stat-sub">Line dengan transaksi</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Unique Item</div>
+          <div class="stat-value" id="statItems">—</div>
+          <div class="stat-sub">Jenis item</div>
+        </div>
+      </div>
+
+      <!-- Tab Navigation -->
+      <nav class="pi-tabs" id="piTabs">
+        <button class="pi-tab active" data-tab="data">Data Produksi</button>
+        <button class="pi-tab"        data-tab="generated">Generated Data Produksi BaaN</button>
+        <button class="pi-tab"        data-tab="summary">Summary per Line</button>
+      </nav>
+
+      <!-- ══ Panel: Data Produksi ══════════════════════════════════ -->
+      <div id="panel-data" class="pi-panel active">
+        <div class="flex items-center gap-3 mb-3 flex-wrap">
+          <span id="piCount" class="text-muted text-sm">0 record</span>
+          <div class="ml-auto flex gap-2">
+            <input type="text" id="searchInput" class="form-control" placeholder="Cari item/order/line..." style="width:220px"/>
+            <button class="btn btn-ghost btn-sm" id="exportRawBtn">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+                <polyline points="7 10 12 15 17 10"/>
+                <line x1="12" y1="15" x2="12" y2="3"/>
+              </svg>
+              Export Raw
+            </button>
+          </div>
+        </div>
+        <div class="table-wrap pi-table-wrap">
+          <div class="table-scroll">
+            <table id="piTable">
+              <thead id="piHead">
+                <tr>
+                  <th>No</th>
+                  <th>Trx. Date</th>
+                  <th>Trx. Time</th>
+                  <th>WH</th>
+                  <th>Trx Number</th>
+                  <th>Order No</th>
+                  <th>Transaction Type</th>
+                  <th>Line</th>
+                  <th>Item</th>
+                  <th>Item Descriptions</th>
+                  <th>Lot No</th>
+                  <th>Model</th>
+                  <th>Qty</th>
+                  <th>Information</th>
+                  <th>User</th>
+                  <th>ResCode</th>
+                </tr>
+              </thead>
+              <tbody id="piBody">
+                <tr><td colspan="16"><div class="empty-state">
+                  <div class="empty-icon">🏭</div>
+                  <div class="empty-title">Belum ada data produksi</div>
+                  <div class="empty-text">Upload file Excel menggunakan tombol di atas</div>
+                </div></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══ Panel: Generated Data Produksi BaaN ═════════════════════ -->
+      <div id="panel-generated" class="pi-panel">
+        <div class="flex items-center gap-3 mb-3 flex-wrap">
+          <span id="genCount" class="text-muted text-sm">0 record</span>
+          <div class="ml-auto flex gap-2">
+            <button class="btn btn-ghost btn-sm" id="exportGenBtn">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+                <polyline points="7 10 12 15 17 10"/>
+                <line x1="12" y1="15" x2="12" y2="3"/>
+              </svg>
+              Export Generated
+            </button>
+          </div>
+        </div>
+        <div class="table-wrap pi-table-wrap">
+          <div class="table-scroll">
+            <table id="genTable">
+              <thead id="genHead">
+                <tr>
+                  <th>No</th>
+                  <th>Date</th>
+                  <th>Year</th>
+                  <th>WO</th>
+                  <th>Code</th>
+                  <th>Item Battery</th>
+                  <th>Item Assy</th>
+                  <th class="g-num">Qty Produksi</th>
+                  <th>Code Battery</th>
+                  <th>Plate Positif</th>
+                  <th>Grid Process (+)</th>
+                  <th class="g-num">Qty Plate (+)</th>
+                  <th class="g-num">Pule (+)</th>
+                  <th>Plate Negatif</th>
+                  <th>Grid Process (-)</th>
+                  <th class="g-num">Qty Plate (-)</th>
+                  <th class="g-num">Pule (-)</th>
+                </tr>
+              </thead>
+              <tbody id="genBody">
+                <tr><td colspan="17"><div class="empty-state">
+                  <div class="empty-icon">⚙️</div>
+                  <div class="empty-title">Belum ada data produksi</div>
+                  <div class="empty-text">Upload file Excel dan pilih periode untuk menampilkan data</div>
+                </div></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══ Panel: Summary per Line ═══════════════════════════════ -->
+      <div id="panel-summary" class="pi-panel">
+        <div class="flex items-center gap-3 mb-3">
+          <span id="sumCount" class="text-muted text-sm">0 line</span>
+          <div class="ml-auto">
+            <button class="btn btn-ghost btn-sm" id="exportSumBtn">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+                <polyline points="7 10 12 15 17 10"/>
+                <line x1="12" y1="15" x2="12" y2="3"/>
+              </svg>
+              Export Summary
+            </button>
+          </div>
+        </div>
+        <div class="table-wrap sum-table-wrap">
+          <div class="table-scroll">
+            <table id="sumTable">
+              <thead>
+                <tr>
+                  <th>No</th>
+                  <th>Line</th>
+                  <th class="s-num">Total Transaksi</th>
+                  <th class="s-num">Total Qty</th>
+                  <th>Model (Unique)</th>
+                </tr>
+              </thead>
+              <tbody id="sumBody">
+                <tr><td colspan="5"><div class="empty-state" style="padding:40px 0">
+                  <div class="empty-icon">📊</div>
+                  <div class="empty-title">Pilih periode untuk melihat Summary</div>
+                </div></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- Column Filter Dropdown -->
+<div id="piFilterDropdown" class="col-filter-dropdown" style="display:none">
+  <input class="filter-search" id="piFilterSearch" placeholder="Cari..."/>
+  <div class="filter-list" id="piFilterList"></div>
+  <div class="filter-actions">
+    <button class="btn btn-xs btn-ghost" id="piFilterSelectAll">Semua</button>
+    <button class="btn btn-xs btn-ghost" id="piFilterClearAll">Hapus</button>
+    <button class="btn btn-xs btn-primary ml-auto" id="piFilterApply">Terapkan</button>
+  </div>
+</div>
+
+<!-- Upload Modal -->
+<div id="uploadModal" style="display:none;position:fixed;inset:0;z-index:100;background:rgba(0,0,0,0.35);align-items:center;justify-content:center">
+  <div style="background:var(--bg-1);border:1px solid var(--border-solid2);border-radius:12px;padding:28px;width:440px;max-width:95vw;box-shadow:0 8px 32px rgba(0,0,0,0.15)">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+      <div>
+        <div style="font-size:15px;font-weight:600;color:var(--text-1)">Upload Data Produksi BaaN</div>
+        <div class="text-muted text-sm" style="margin-top:2px">Periode akan dideteksi otomatis dari kolom Trx. Date</div>
+      </div>
+      <button class="btn btn-ghost btn-xs" id="closeUploadModal">✕</button>
+    </div>
+    <div id="modalDropZone" style="border:2px dashed var(--border-solid2);border-radius:8px;padding:40px 16px;text-align:center;cursor:pointer;transition:border-color .15s,background .15s">
+      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="opacity:.4;margin:0 auto 10px">
+        <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+        <polyline points="17 8 12 3 7 8"/>
+        <line x1="12" y1="3" x2="12" y2="15"/>
+      </svg>
+      <div style="font-size:13px;font-weight:500;color:var(--text-2)">Klik atau drag file Excel ke sini</div>
+      <div style="font-size:11px;color:var(--text-4);margin-top:4px">.xlsx / .xls</div>
+    </div>
+    <div style="text-align:right;margin-top:16px">
+      <button class="btn btn-ghost btn-sm" id="cancelUploadModal">Batal</button>
     </div>
   </div>
 </div>
 
 <script src="shared-components.js"></script>
 <script>
-function pageInit() {
+// ── IndexedDB storage ──────────────────────────────────────────────
+const PiDB = (() => {
+  const DB_NAME = 'bpms_produksi_baan';
+  const DB_VER  = 1;
+  const STORE   = 'periods';
+
+  function open() {
+    return new Promise((resolve, reject) => {
+      const req = indexedDB.open(DB_NAME, DB_VER);
+      req.onupgradeneeded = e => e.target.result.createObjectStore(STORE);
+      req.onsuccess       = e => resolve(e.target.result);
+      req.onerror         = e => reject(e.target.error);
+    });
+  }
+
+  async function getPeriods() {
+    const db = await open();
+    return new Promise((resolve, reject) => {
+      const req = db.transaction(STORE, 'readonly').objectStore(STORE).getAllKeys();
+      req.onsuccess = () => resolve([...req.result].sort().reverse());
+      req.onerror   = () => reject(req.error);
+    });
+  }
+
+  async function getData(period) {
+    const db = await open();
+    return new Promise((resolve, reject) => {
+      const req = db.transaction(STORE, 'readonly').objectStore(STORE).get(period);
+      req.onsuccess = () => resolve(req.result || []);
+      req.onerror   = () => reject(req.error);
+    });
+  }
+
+  async function setData(period, rows) {
+    const db = await open();
+    return new Promise((resolve, reject) => {
+      const req = db.transaction(STORE, 'readwrite').objectStore(STORE).put(rows, period);
+      req.onsuccess = () => resolve(true);
+      req.onerror   = () => reject(req.error);
+    });
+  }
+
+  async function deleteData(period) {
+    const db = await open();
+    return new Promise((resolve, reject) => {
+      const req = db.transaction(STORE, 'readwrite').objectStore(STORE).delete(period);
+      req.onsuccess = () => resolve(true);
+      req.onerror   = () => reject(req.error);
+    });
+  }
+
+  return { getPeriods, getData, setData, deleteData };
+})();
+
+let _piCache        = {};
+let _piPeriods      = [];
+let currentPeriod   = '';
+let colFilters      = {};
+let activeFilterKey = null;
+
+// ── Header map ────────────────────────────────────────────────────
+
+const HEADER_MAP = {
+  trxDate:  ['Trx. Date', 'TRX. DATE', 'Trx Date', 'Transaction Date', 'Date'],
+  trxTime:  ['Trx.Time', 'Trx. Time', 'TRX. TIME', 'Trx Time', 'Time'],
+  wh:       ['WH', 'Warehouse', 'WAREHOUSE'],
+  trxNumber:['Trx Number', 'TRX NUMBER', 'Trx. Number', 'Transaction Number', 'Trx No'],
+  orderNo:  ['Order No', 'ORDER NO', 'Order Number', 'Order No.'],
+  trxType:  ['Transaction Type', 'TRANSACTION TYPE', 'Trx Type', 'Type'],
+  line:     ['Line', 'LINE', 'Line No', 'Line Number'],
+  item:     ['Item', 'ITEM', 'Item No', 'Item Number', 'Part No'],
+  itemDesc: ['Item Descriptions', 'ITEM DESCRIPTIONS', 'Item Description', 'Description', 'Desc'],
+  lotNo:    ['Lot No', 'LOT NO', 'Lot Number', 'Lot'],
+  model:    ['Model', 'MODEL'],
+  qty:      ['Qty', 'QTY', 'Quantity', 'QUANTITY'],
+  information: ['Information', 'INFORMATION', 'Info'],
+  user:     ['User', 'USER', 'User ID', 'Username'],
+  resCode:  ['ResCode', 'RESCODE', 'Res Code', 'Resource Code'],
+};
+
+function findCol(obj, aliases) {
+  const keys = Object.keys(obj);
+  for (const a of aliases) {
+    const k = keys.find(k => k.trim().toUpperCase() === a.toUpperCase());
+    if (k !== undefined) return obj[k];
+  }
+  return '';
+}
+
+// ── pageInit ──────────────────────────────────────────────────────
+
+async function pageInit() {
   document.getElementById('topbarMount').innerHTML = BPMS.renderTopbar('Data Produksi BaaN');
+
+  document.getElementById('piTabs').addEventListener('click', e => {
+    const btn = e.target.closest('.pi-tab');
+    if (!btn) return;
+    document.querySelectorAll('.pi-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.pi-panel').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('panel-' + btn.dataset.tab).classList.add('active');
+    if (btn.dataset.tab === 'data')      renderTable();
+    if (btn.dataset.tab === 'generated') renderGenerated();
+    if (btn.dataset.tab === 'summary')   renderSummary();
+  });
+
+  const sel = document.getElementById('periodSelect');
+  sel.addEventListener('change', async () => {
+    currentPeriod = sel.value;
+    BPMS.showLoading();
+    try {
+      if (currentPeriod) {
+        await loadPeriodData(currentPeriod);
+      } else {
+        await loadAllPeriods();
+      }
+    } catch(e) { /* tetap render dengan data yang ada */ }
+    BPMS.hideLoading();
+    const tab = document.querySelector('.pi-tab.active')?.dataset.tab;
+    if (tab === 'data')      renderTable();
+    if (tab === 'generated') renderGenerated();
+    if (tab === 'summary')   renderSummary();
+  });
+
+  BPMS.showLoading();
+  try {
+    await populatePeriods();
+    if (_piPeriods.length > 0) {
+      currentPeriod = _piPeriods[0];
+      sel.value = currentPeriod;
+      await loadPeriodData(currentPeriod);
+    }
+  } catch(e) { /* server tidak tersedia, mulai kosong */ }
+  BPMS.hideLoading();
+  renderTable();
+
+  // Upload modal
+  document.getElementById('uploadBtn').addEventListener('click', openUploadModal);
+  document.getElementById('closeUploadModal').addEventListener('click', closeUploadModal);
+  document.getElementById('cancelUploadModal').addEventListener('click', closeUploadModal);
+  document.getElementById('uploadModal').addEventListener('click', e => { if (e.target === e.currentTarget) closeUploadModal(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeUploadModal(); });
+
+  const dropZone = document.getElementById('modalDropZone');
+  const input    = document.getElementById('fileInput');
+  dropZone.addEventListener('click', () => input.click());
+  dropZone.addEventListener('dragover', e => {
+    e.preventDefault();
+    dropZone.style.borderColor = 'var(--accent)';
+    dropZone.style.background  = 'rgba(94,106,210,.05)';
+  });
+  dropZone.addEventListener('dragleave', () => {
+    dropZone.style.borderColor = '';
+    dropZone.style.background  = '';
+  });
+  dropZone.addEventListener('drop', e => {
+    e.preventDefault();
+    dropZone.style.borderColor = '';
+    dropZone.style.background  = '';
+    closeUploadModal();
+    handleFile(e.dataTransfer.files[0]);
+  });
+  input.addEventListener('change', () => {
+    closeUploadModal();
+    handleFile(input.files[0]);
+    input.value = '';
+  });
+
+  document.getElementById('cancelUpload').addEventListener('click', () => {
+    pendingGroups = new Map();
+    document.getElementById('previewPanel').style.display = 'none';
+  });
+  document.getElementById('commitUpload').addEventListener('click', commitUpload);
+  document.getElementById('deletePeriodBtn').addEventListener('click', deletePeriod);
+  document.getElementById('searchInput').addEventListener('input', renderTable);
+  document.getElementById('exportRawBtn').addEventListener('click', exportRaw);
+  document.getElementById('exportGenBtn').addEventListener('click', exportGenerated);
+  document.getElementById('exportSumBtn').addEventListener('click', exportSummary);
+
+  // Column filter wiring
+  document.getElementById('piFilterApply').addEventListener('click', () => { closeFilter(); renderTable(); });
+  document.getElementById('piFilterSelectAll').addEventListener('click', () =>
+    document.querySelectorAll('#piFilterList input[type=checkbox]').forEach(cb => cb.checked = true));
+  document.getElementById('piFilterClearAll').addEventListener('click', () =>
+    document.querySelectorAll('#piFilterList input[type=checkbox]').forEach(cb => cb.checked = false));
+  document.getElementById('piFilterSearch').addEventListener('input', e => {
+    const q = e.target.value.toLowerCase();
+    document.querySelectorAll('#piFilterList .filter-opt').forEach(opt =>
+      opt.style.display = opt.textContent.toLowerCase().includes(q) ? '' : 'none');
+  });
+  document.getElementById('piFilterDropdown').addEventListener('click', e => e.stopPropagation());
+  document.addEventListener('click', closeFilter);
+}
+
+// ── Upload Modal ──────────────────────────────────────────────────
+
+function openUploadModal() {
+  document.getElementById('uploadModal').style.display = 'flex';
+}
+
+function closeUploadModal() {
+  document.getElementById('uploadModal').style.display = 'none';
+}
+
+// Konversi nilai waktu dari SheetJS → "hh:mm:ss"
+function normalizeTime(raw) {
+  if (!raw && raw !== 0) return '';
+  if (raw instanceof Date) {
+    const h = String(raw.getHours()).padStart(2, '0');
+    const m = String(raw.getMinutes()).padStart(2, '0');
+    const s = String(raw.getSeconds()).padStart(2, '0');
+    return `${h}:${m}:${s}`;
+  }
+  if (typeof raw === 'number' && raw >= 0 && raw < 1) {
+    const total = Math.round(raw * 86400);
+    const h = Math.floor(total / 3600);
+    const m = Math.floor((total % 3600) / 60);
+    const s = total % 60;
+    return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+  }
+  const str = String(raw).trim();
+  const t = str.match(/(\d{1,2}):(\d{2})(?::(\d{2}))?/);
+  if (t) return `${t[1].padStart(2,'0')}:${t[2]}:${(t[3] || '00')}`;
+  return str;
+}
+
+// Konversi nilai mentah dari SheetJS → "DD/MM/YYYY"
+function normalizeTrxDate(raw) {
+  if (!raw && raw !== 0) return '';
+  if (raw instanceof Date) {
+    if (isNaN(raw)) return '';
+    const d  = String(raw.getDate()).padStart(2, '0');
+    const mo = String(raw.getMonth() + 1).padStart(2, '0');
+    return `${d}/${mo}/${raw.getFullYear()}`;
+  }
+  if (typeof raw === 'number' && raw > 1000) {
+    try {
+      const dt = XLSX.SSF.parse_date_code(raw);
+      if (dt && dt.y > 2000) {
+        return `${String(dt.d).padStart(2,'0')}/${String(dt.m).padStart(2,'0')}/${dt.y}`;
+      }
+    } catch(_) {}
+  }
+  return String(raw).trim();
+}
+
+// Parse "DD/MM/YYYY" → "YYYY-MM"
+function parsePeriodFromDate(trxDate) {
+  if (!trxDate) return null;
+  const s = String(trxDate).trim();
+  if (!s) return null;
+
+  let m;
+  m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if (m) return `${m[3]}-${m[2].padStart(2, '0')}`;
+
+  m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (m) return `${m[1]}-${m[2]}`;
+
+  m = s.match(/^(\d{1,2})-(\d{1,2})-(\d{4})/);
+  if (m) return `${m[3]}-${m[2].padStart(2, '0')}`;
+
+  const serial = Number(s);
+  if (!isNaN(serial) && serial > 1000) {
+    try {
+      const dt = XLSX.SSF.parse_date_code(serial);
+      if (dt && dt.y > 2000) return `${dt.y}-${String(dt.m).padStart(2, '0')}`;
+    } catch (_) {}
+  }
+
+  return null;
+}
+
+// ── Storage helpers (server primary, IndexedDB cache) ─────────────
+
+async function loadPeriodData(period) {
+  if (_piCache[period]) return _piCache[period];
+  try {
+    const cached = await PiDB.getData(period);
+    if (cached && cached.length) { _piCache[period] = cached; return cached; }
+  } catch (_) {}
+  try {
+    const r = await fetch('api/produksi-baan.php?period=' + period, { cache: 'no-store' });
+    if (r.ok) {
+      const j = await r.json();
+      if (j.ok && Array.isArray(j.data)) {
+        _piCache[period] = j.data;
+        try { await PiDB.setData(period, j.data); } catch (_) {}
+        return j.data;
+      }
+    }
+  } catch (_) {}
+  _piCache[period] = [];
+  return [];
+}
+
+async function loadAllPeriods() {
+  await Promise.all(_piPeriods.filter(p => !_piCache[p]).map(p => loadPeriodData(p)));
+}
+
+async function populatePeriods() {
+  try {
+    const r = await fetch('api/produksi-baan.php', { cache: 'no-store' });
+    if (r.ok) {
+      const j = await r.json();
+      if (j.ok && Array.isArray(j.periods)) { _piPeriods = j.periods; }
+      else throw new Error('bad response');
+    } else { throw new Error('server error'); }
+  } catch (_) {
+    try { _piPeriods = await PiDB.getPeriods(); } catch { _piPeriods = []; }
+  }
+
+  const sel     = document.getElementById('periodSelect');
+  const current = sel.value;
+  sel.innerHTML = '<option value="">-- Semua Periode --</option>';
+  _piPeriods.forEach(p => {
+    const opt = document.createElement('option');
+    opt.value       = p;
+    opt.textContent = BPMS.formatPeriod(p);
+    sel.appendChild(opt);
+  });
+  if (current && _piPeriods.includes(current)) sel.value = current;
+}
+
+async function deletePeriod() {
+  if (!currentPeriod) { BPMS.toast('Pilih periode terlebih dahulu', 'error'); return; }
+  if (!confirm(`Hapus semua data produksi periode ${BPMS.formatPeriod(currentPeriod)}?`)) return;
+  try {
+    let serverOk = false;
+    try {
+      const r = await fetch('api/produksi-baan.php?period=' + currentPeriod, { method: 'DELETE' });
+      serverOk = r.ok;
+    } catch (_) {}
+    try { await PiDB.deleteData(currentPeriod); } catch (_) {}
+    delete _piCache[currentPeriod];
+    _piPeriods = _piPeriods.filter(p => p !== currentPeriod);
+    currentPeriod = '';
+    await populatePeriods();
+    renderTable();
+    BPMS.toast(serverOk ? 'Periode dihapus' : 'Periode dihapus lokal (server tidak terjangkau)', serverOk ? 'info' : 'error');
+  } catch(err) {
+    BPMS.toast('Gagal menghapus: ' + err.message, 'error');
+  }
+}
+
+// ── File Import ───────────────────────────────────────────────────
+
+let pendingGroups = new Map();
+
+function handleFile(file) {
+  if (!file) return;
+  BPMS.showLoading();
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const wb   = XLSX.read(e.target.result, { type: 'binary', cellDates: true });
+      const ws   = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
+
+      const parsed = rows.map(row => {
+        const qty = Number(findCol(row, HEADER_MAP.qty)) || 0;
+        return {
+          trxDate:     normalizeTrxDate(findCol(row, HEADER_MAP.trxDate)),
+          trxTime:     normalizeTime(findCol(row, HEADER_MAP.trxTime)),
+          wh:          String(findCol(row, HEADER_MAP.wh)).trim(),
+          trxNumber:   String(findCol(row, HEADER_MAP.trxNumber)).trim(),
+          orderNo:     String(findCol(row, HEADER_MAP.orderNo)).trim(),
+          trxType:     String(findCol(row, HEADER_MAP.trxType)).trim(),
+          line:        String(findCol(row, HEADER_MAP.line)).trim(),
+          item:        String(findCol(row, HEADER_MAP.item)).trim(),
+          itemDesc:    String(findCol(row, HEADER_MAP.itemDesc)).trim(),
+          lotNo:       String(findCol(row, HEADER_MAP.lotNo)).trim(),
+          model:       String(findCol(row, HEADER_MAP.model)).trim(),
+          qty,
+          information: String(findCol(row, HEADER_MAP.information)).trim(),
+          user:        String(findCol(row, HEADER_MAP.user)).trim(),
+          resCode:     String(findCol(row, HEADER_MAP.resCode)).trim(),
+        };
+      }).filter(r => r.trxDate || r.item || r.qty);
+
+      BPMS.hideLoading();
+      if (!parsed.length) { BPMS.toast('Tidak ada data valid ditemukan', 'error'); return; }
+
+      pendingGroups = new Map();
+      parsed.forEach(r => {
+        const p = parsePeriodFromDate(r.trxDate) || 'unknown';
+        if (!pendingGroups.has(p)) pendingGroups.set(p, []);
+        pendingGroups.get(p).push(r);
+      });
+
+      if (pendingGroups.has('unknown')) {
+        BPMS.toast(`${pendingGroups.get('unknown').length} baris tidak dapat dideteksi periodenya`, 'error');
+      }
+
+      showPreview(parsed, pendingGroups);
+    } catch (err) {
+      BPMS.hideLoading();
+      BPMS.toast('Gagal membaca file: ' + err.message, 'error');
+    }
+  };
+  reader.readAsBinaryString(file);
+}
+
+function showPreview(data, groups) {
+  const totalQty    = data.reduce((s, r) => s + r.qty, 0);
+  const validGroups = [...groups.entries()].filter(([p]) => p !== 'unknown').sort((a, b) => a[0].localeCompare(b[0]));
+  const periodBadges = validGroups
+    .map(([p, rows]) => `<span class="badge badge-neutral">${BPMS.formatPeriod(p)} (${rows.length.toLocaleString()} record)</span>`)
+    .join(' ');
+
+  const unknownCount = groups.has('unknown') ? groups.get('unknown').length : 0;
+
+  document.getElementById('previewStats').innerHTML =
+    `<span><strong>${data.length.toLocaleString()}</strong> record</span>
+     · <span>Total Qty: <strong>${totalQty.toLocaleString()}</strong></span>
+     · <span>Periode terdeteksi: ${periodBadges || '<em style="color:var(--error)">Tidak ada periode terdeteksi — periksa kolom Trx. Date</em>'}</span>
+     ${unknownCount ? `<br><small style="color:var(--error)">⚠ ${unknownCount} baris tidak dapat dideteksi periodenya dan akan dilewati</small>` : ''}`;
+
+  document.getElementById('previewBody').innerHTML = data.slice(0, 200).map((r, i) => `<tr>
+    <td class="text-muted">${i + 1}</td>
+    <td>${r.trxDate}</td>
+    <td class="td-muted">${r.trxTime}</td>
+    <td>${r.wh}</td>
+    <td class="td-muted">${r.trxNumber}</td>
+    <td>${r.orderNo}</td>
+    <td>${r.trxType}</td>
+    <td><span class="badge badge-neutral">${r.line || '—'}</span></td>
+    <td class="td-item">${r.item}</td>
+    <td>${r.itemDesc}</td>
+    <td class="td-muted">${r.lotNo || '—'}</td>
+    <td>${r.model || '—'}</td>
+    <td class="td-qty">${r.qty.toLocaleString()}</td>
+    <td class="td-muted">${r.information || '—'}</td>
+    <td class="td-muted">${r.user}</td>
+    <td class="td-muted">${r.resCode || '—'}</td>
+  </tr>`).join('') + (data.length > 200
+    ? `<tr><td colspan="16" class="text-center text-muted" style="padding:10px">
+        ... dan ${(data.length - 200).toLocaleString()} record lainnya (ditampilkan 200 pertama)
+      </td></tr>`
+    : '');
+
+  document.getElementById('previewPanel').style.display = '';
+}
+
+async function commitUpload() {
+  if (!pendingGroups.size) return;
+
+  const validPeriods = [...pendingGroups.entries()].filter(([p]) => p !== 'unknown');
+  if (!validPeriods.length) {
+    BPMS.toast('Tidak ada data valid untuk disimpan — periode tidak dapat dideteksi dari kolom Trx. Date', 'error');
+    return;
+  }
+
+  BPMS.showLoading();
+  let totalSaved    = 0;
+  const savedLabels = [];
+  let offlineOnly   = false;
+
+  try {
+    for (const [period, rows] of validPeriods) {
+      let serverOk = false;
+      try {
+        const r = await fetch('api/produksi-baan.php', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ period, data: rows }),
+        });
+        if (r.ok) { const j = await r.json(); serverOk = j.ok; }
+      } catch (_) {}
+      if (!serverOk) offlineOnly = true;
+      try { await PiDB.setData(period, rows); } catch (_) {}
+      _piCache[period] = rows;
+      if (!_piPeriods.includes(period)) _piPeriods.push(period);
+      totalSaved += rows.length;
+      savedLabels.push(BPMS.formatPeriod(period));
+    }
+  } catch(err) {
+    BPMS.hideLoading();
+    BPMS.toast('Gagal menyimpan: ' + err.message, 'error');
+    return;
+  }
+
+  BPMS.hideLoading();
+
+  if (!totalSaved) {
+    BPMS.toast('Tidak ada data berhasil disimpan', 'error');
+    return;
+  }
+
+  if (offlineOnly) {
+    BPMS.toast(`${totalSaved.toLocaleString()} record disimpan lokal (server tidak terjangkau — upload ulang saat online): ${savedLabels.join(', ')}`, 'error');
+  } else {
+    BPMS.toast(`${totalSaved.toLocaleString()} record disimpan ke: ${savedLabels.join(', ')}`, 'success');
+  }
+  pendingGroups = new Map();
+  document.getElementById('previewPanel').style.display = 'none';
+
+  _piPeriods.sort().reverse();
+  await populatePeriods();
+
+  currentPeriod = _piPeriods[0] || '';
+  document.getElementById('periodSelect').value = currentPeriod;
+
+  const tab = document.querySelector('.pi-tab.active')?.dataset.tab;
+  renderTable();
+  if (tab === 'generated') renderGenerated();
+  if (tab === 'summary')   renderSummary();
+}
+
+// ── Column Filter ─────────────────────────────────────────────────
+
+const FILTERABLE_COLS = {
+  trxDate: 'Trx. Date',
+  wh:      'WH',
+  trxType: 'Transaction Type',
+  line:    'Line',
+  model:   'Model',
+  user:    'User',
+};
+
+function getRowValue(row, key) {
+  return String(row[key] || '');
+}
+
+function openFilter(key, triggerEl) {
+  activeFilterKey = key;
+  const allRows = getAllRows();
+  const vals    = [...new Set(allRows.map(r => getRowValue(r, key)))].sort();
+  const sel     = colFilters[key] || new Set(vals);
+
+  document.getElementById('piFilterSearch').value = '';
+  document.getElementById('piFilterList').innerHTML = vals.map(v =>
+    `<label class="filter-opt">
+      <input type="checkbox" value="${v.replace(/"/g,'&quot;')}"${sel.has(v) ? ' checked' : ''}/>
+      <span>${v || '<em style="color:var(--text-4)">Kosong</em>'}</span>
+    </label>`
+  ).join('');
+
+  const dropdown = document.getElementById('piFilterDropdown');
+  dropdown.style.display = 'flex';
+  const thEl = triggerEl.closest('th') || triggerEl;
+  const rect  = thEl.getBoundingClientRect();
+  const ddW   = Math.max(200, rect.width);
+  let left    = rect.left;
+  if (left + ddW > window.innerWidth - 8) left = window.innerWidth - ddW - 8;
+  dropdown.style.left     = left + 'px';
+  dropdown.style.top      = (rect.bottom + 4) + 'px';
+  dropdown.style.minWidth = ddW + 'px';
+  document.getElementById('piFilterSearch').focus();
+}
+
+function closeFilter() {
+  if (!activeFilterKey) return;
+  const checkboxes = [...document.querySelectorAll('#piFilterList input[type=checkbox]')];
+  if (checkboxes.length) {
+    const checked = new Set(checkboxes.filter(cb => cb.checked).map(cb => cb.value));
+    if (checked.size === checkboxes.length) delete colFilters[activeFilterKey];
+    else colFilters[activeFilterKey] = checked;
+  }
+  document.getElementById('piFilterDropdown').style.display = 'none';
+  activeFilterKey = null;
+}
+
+// ── Data helpers ──────────────────────────────────────────────────
+
+function getAllRows() {
+  if (currentPeriod) {
+    return (_piCache[currentPeriod] || []).map(r => ({ ...r, _period: currentPeriod }));
+  }
+  const all = [];
+  [..._piPeriods].sort().reverse().forEach(p => {
+    (_piCache[p] || []).forEach(r => all.push({ ...r, _period: p }));
+  });
+  return all;
+}
+
+// ── Render Table ──────────────────────────────────────────────────
+
+function renderTable() {
+  const body    = document.getElementById('piBody');
+  const q       = (document.getElementById('searchInput')?.value || '').toLowerCase();
+  const allRows = getAllRows();
+
+  const filtered = allRows.filter(r => {
+    if (q) {
+      const txt = `${r.item} ${r.itemDesc} ${r.orderNo} ${r.trxNumber} ${r.line} ${r.model}`.toLowerCase();
+      if (!txt.includes(q)) return false;
+    }
+    for (const [key, sel] of Object.entries(colFilters)) {
+      if (sel.size && !sel.has(getRowValue(r, key))) return false;
+    }
+    return true;
+  });
+
+  const totalQty    = filtered.reduce((s, r) => s + r.qty, 0);
+  const activeLines = new Set(filtered.map(r => r.line).filter(Boolean));
+  const uniqueItems = new Set(filtered.map(r => r.item).filter(Boolean));
+
+  document.getElementById('statTotal').textContent  = filtered.length.toLocaleString();
+  document.getElementById('statQty').textContent    = totalQty.toLocaleString();
+  document.getElementById('statLines').textContent  = activeLines.size || '—';
+  document.getElementById('statItems').textContent  = uniqueItems.size || '—';
+  document.getElementById('piCount').textContent    = `${filtered.length.toLocaleString()} / ${allRows.length.toLocaleString()} record`;
+
+  if (!filtered.length) {
+    body.innerHTML = `<tr><td colspan="16"><div class="empty-state">
+      <div class="empty-icon">🏭</div>
+      <div class="empty-title">${allRows.length ? 'Tidak ada hasil pencarian' : 'Belum ada data produksi'}</div>
+      ${!allRows.length ? '<div class="empty-text">Upload file Excel menggunakan tombol di atas</div>' : ''}
+    </div></td></tr>`;
+    renderTableHeader(allRows);
+    return;
+  }
+
+  renderTableHeader(allRows);
+
+  const showPeriod = !currentPeriod;
+  const CHUNK = 500;
+  body.innerHTML = '';
+
+  let idx = 0;
+  function renderChunk() {
+    const frag = document.createDocumentFragment();
+    const end  = Math.min(idx + CHUNK, filtered.length);
+    for (let i = idx; i < end; i++) {
+      const r   = filtered[i];
+      const tr  = document.createElement('tr');
+      const per = showPeriod
+        ? `<td><span class="badge badge-neutral">${BPMS.formatPeriod(r._period)}</span></td>`
+        : '';
+      tr.innerHTML = `
+        ${per}
+        <td class="text-muted">${i + 1}</td>
+        <td>${r.trxDate}</td>
+        <td class="td-muted">${r.trxTime}</td>
+        <td>${r.wh}</td>
+        <td class="td-muted">${r.trxNumber}</td>
+        <td>${r.orderNo}</td>
+        <td>${r.trxType}</td>
+        <td><span class="badge badge-neutral">${r.line || '—'}</span></td>
+        <td class="td-item">${r.item}</td>
+        <td>${r.itemDesc}</td>
+        <td class="td-muted">${r.lotNo || '—'}</td>
+        <td>${r.model || '—'}</td>
+        <td class="td-qty">${r.qty.toLocaleString()}</td>
+        <td class="td-muted">${r.information || '—'}</td>
+        <td class="td-muted">${r.user}</td>
+        <td class="td-muted">${r.resCode || '—'}</td>`;
+      frag.appendChild(tr);
+    }
+    body.appendChild(frag);
+    idx = end;
+    if (idx < filtered.length) requestAnimationFrame(renderChunk);
+  }
+  renderChunk();
+}
+
+function renderTableHeader(allRows) {
+  const showPeriod = !currentPeriod;
+  const fi = key => {
+    const allVals = [...new Set(allRows.map(r => getRowValue(r, key)))];
+    const active  = colFilters[key] && colFilters[key].size < allVals.length;
+    return `<span class="th-filter-pi" onclick="openFilter('${key}',this);event.stopPropagation()">
+      <span class="filter-icon-pi${active ? ' active' : ''}">▾</span>
+    </span>`;
+  };
+  const periodTh = showPeriod ? '<th>Periode</th>' : '';
+  document.getElementById('piHead').innerHTML = `<tr>
+    ${periodTh}
+    <th>No</th>
+    <th>Trx. Date ${fi('trxDate')}</th>
+    <th>Trx. Time</th>
+    <th>WH ${fi('wh')}</th>
+    <th>Trx Number</th>
+    <th>Order No</th>
+    <th>Transaction Type ${fi('trxType')}</th>
+    <th>Line ${fi('line')}</th>
+    <th>Item</th>
+    <th>Item Descriptions</th>
+    <th>Lot No</th>
+    <th>Model ${fi('model')}</th>
+    <th>Qty</th>
+    <th>Information</th>
+    <th>User ${fi('user')}</th>
+    <th>ResCode</th>
+  </tr>`;
+}
+
+// ── Generated Data — lookup helpers (sama dengan Infor) ───────────
+
+function findColKeyPI(rowSample, ...patterns) {
+  const keys = Object.keys(rowSample);
+  for (const pat of patterns) {
+    const k = keys.find(k => k.trim().toLowerCase() === pat.toLowerCase());
+    if (k) return k;
+  }
+  for (const pat of patterns) {
+    const k = keys.find(k => k.trim().toLowerCase().includes(pat.toLowerCase()));
+    if (k) return k;
+  }
+  return null;
+}
+
+function buildLookupMapsPI() {
+  const state = BPMS.getState();
+
+  const plateMap = new Map();
+  const plateRows = state.dbPlateInfor || [];
+  if (plateRows.length) {
+    const s    = plateRows[0];
+    const vals = Object.keys(s);
+    const kKey = findColKeyPI(s, 'Item Data Infor', 'ItemDataInfor') || vals[1];
+    const kPnP = findColKeyPI(s, 'PN Plate Positif', 'PN Positif')   || vals[2];
+    const kQtP = findColKeyPI(s, 'Qty Plate Positif', 'Qty Positif') || vals[3];
+    const kPnN = findColKeyPI(s, 'PN Plate Negatif', 'PN Negatif')   || vals[4];
+    const kQtN = findColKeyPI(s, 'Qty Plate Negatif', 'Qty Negatif') || vals[5];
+    plateRows.forEach(row => {
+      const key = String(row[kKey] ?? '').trim();
+      if (!key) return;
+      plateMap.set(key, {
+        pnPos : String(row[kPnP] ?? ''),
+        qtyPos: Number(row[kQtP]) || 0,
+        pnNeg : String(row[kPnN] ?? ''),
+        qtyNeg: Number(row[kQtN]) || 0,
+      });
+    });
+  }
+
+  const typeMap = new Map();
+  const typeRows = state.dbTypePlate || [];
+  if (typeRows.length) {
+    const s     = typeRows[0];
+    const vals  = Object.keys(s);
+    const kCode = findColKeyPI(s, 'Type Plate', 'Code') || vals[2];
+    const kGrid = findColKeyPI(s, 'Grid Process', 'Grid') || vals[3];
+    typeRows.forEach(row => {
+      const key = String(row[kCode] ?? '').trim();
+      if (key) typeMap.set(key, String(row[kGrid] ?? ''));
+    });
+  }
+
+  const puLeMap = new Map();
+  const puLeRows = state.dbPuLe || [];
+  if (puLeRows.length) {
+    const s      = puLeRows[0];
+    const vals   = Object.keys(s);
+    const kPN    = findColKeyPI(s, 'PN Plate Infor', 'PN Plate', 'PN') || vals[2];
+    const kRatio = findColKeyPI(s, 'Qty Pule/Plate (kg)', 'Qty Pule/Plate', 'Qty Pule') || vals[4];
+    puLeRows.forEach(row => {
+      const key = String(row[kPN] ?? '').trim();
+      if (key) puLeMap.set(key, Number(row[kRatio]) || 0);
+    });
+  }
+
+  return { plateMap, typeMap, puLeMap };
+}
+
+function puleKeyPI(pn) {
+  return pn.charAt(2) === 'F' ? 'W-UNPL-' + pn.substring(7) : pn;
+}
+
+function computeGenPiRow(r, maps) {
+  const { plateMap, typeMap, puLeMap } = maps;
+  const item = r.item || '';
+  const qty  = r.qty  || 0;
+
+  const code          = item.charAt(4);
+  const itemAssy      = item;
+  let   itemBattery   = itemAssy;
+  if (itemAssy.charAt(0) === 'W') {
+    const c = itemAssy.split('');
+    c[0] = 'F';
+    c[4] = 'W';
+    itemBattery = c.join('');
+  }
+  const itemDataInfor = item.substring(2, 19);
+  const codeBattery   = itemBattery.substring(2, 19);
+  const year          = r.trxDate ? r.trxDate.slice(-4) : '';
+  const pv            = plateMap.get(itemDataInfor) || {};
+  const pnPos         = pv.pnPos  || '';
+  const qpPos         = (pv.qtyPos || 0) * qty;
+  const pnNeg         = pv.pnNeg  || '';
+  const qpNeg         = (pv.qtyNeg || 0) * qty;
+  const gridPos       = typeMap.get(pnPos.substring(7, 11)) ?? '';
+  const gridNeg       = typeMap.get(pnNeg.substring(7, 11)) ?? '';
+  const qPulePos      = Math.round((puLeMap.get(puleKeyPI(pnPos)) || 0) * qpPos);
+  const qPuleNeg      = Math.round((puLeMap.get(puleKeyPI(pnNeg)) || 0) * qpNeg);
+  const wo            = String(r.orderNo || '').substring(0, 4);
+
+  return { code, wo, itemAssy, itemBattery, codeBattery, year, pnPos, gridPos, qpPos, qPulePos, pnNeg, gridNeg, qpNeg, qPuleNeg };
+}
+
+function renderGenerated() {
+  const body  = document.getElementById('genBody');
+  const count = document.getElementById('genCount');
+  const allRows = getAllRows();
+
+  if (!allRows.length) {
+    count.textContent = '0 record';
+    body.innerHTML = `<tr><td colspan="17"><div class="empty-state">
+      <div class="empty-icon">⚙️</div>
+      <div class="empty-title">Belum ada data produksi</div>
+      <div class="empty-text">Upload file Excel dan pilih periode untuk menampilkan data</div>
+    </div></td></tr>`;
+    return;
+  }
+
+  const maps = buildLookupMapsPI();
+  count.textContent = `${allRows.length.toLocaleString()} record`;
+
+  const dash = v => (v !== '' && v != null) ? v : '<span class="g-muted">—</span>';
+  const num  = v => v ? Number(v).toLocaleString() : '0';
+
+  body.innerHTML = '';
+  const CHUNK = 500;
+  let idx = 0;
+
+  function renderChunk() {
+    const frag = document.createDocumentFragment();
+    const end  = Math.min(idx + CHUNK, allRows.length);
+    for (let i = idx; i < end; i++) {
+      const r  = allRows[i];
+      const g  = computeGenPiRow(r, maps);
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td class="g-muted">${i + 1}</td>
+        <td>${r.trxDate || '—'}</td>
+        <td>${g.year || '—'}</td>
+        <td>${dash(g.wo)}</td>
+        <td class="g-item">${dash(g.code)}</td>
+        <td class="g-item">${dash(g.itemBattery)}</td>
+        <td class="g-item">${dash(g.itemAssy)}</td>
+        <td class="g-qty">${num(r.qty)}</td>
+        <td class="g-item">${dash(g.codeBattery)}</td>
+        <td class="g-item">${dash(g.pnPos)}</td>
+        <td>${dash(g.gridPos)}</td>
+        <td class="g-qty">${num(g.qpPos)}</td>
+        <td class="g-qty">${num(g.qPulePos)}</td>
+        <td class="g-item">${dash(g.pnNeg)}</td>
+        <td>${dash(g.gridNeg)}</td>
+        <td class="g-qty">${num(g.qpNeg)}</td>
+        <td class="g-qty">${num(g.qPuleNeg)}</td>`;
+      frag.appendChild(tr);
+    }
+    body.appendChild(frag);
+    idx = end;
+    if (idx < allRows.length) requestAnimationFrame(renderChunk);
+  }
+  renderChunk();
+}
+
+// ── Render Summary ─────────────────────────────────────────────────
+
+function renderSummary() {
+  const body    = document.getElementById('sumBody');
+  const allRows = getAllRows();
+
+  if (!allRows.length) {
+    document.getElementById('sumCount').textContent = '0 line';
+    body.innerHTML = `<tr><td colspan="5"><div class="empty-state" style="padding:40px 0">
+      <div class="empty-icon">📊</div>
+      <div class="empty-title">Belum ada data produksi</div>
+    </div></td></tr>`;
+    return;
+  }
+
+  const lineMap = new Map();
+  allRows.forEach(r => {
+    const key = r.line || '(Tidak Diketahui)';
+    if (!lineMap.has(key)) lineMap.set(key, { count: 0, qty: 0, models: new Set() });
+    const e = lineMap.get(key);
+    e.count++;
+    e.qty += r.qty;
+    if (r.model) e.models.add(r.model);
+  });
+
+  const sorted = [...lineMap.entries()].sort((a, b) => {
+    const na = parseInt(a[0]), nb = parseInt(b[0]);
+    if (!isNaN(na) && !isNaN(nb)) return na - nb;
+    return a[0].localeCompare(b[0]);
+  });
+
+  document.getElementById('sumCount').textContent = `${sorted.length} line`;
+
+  const fmt = v => v.toLocaleString();
+  let html = sorted.map(([line, d], i) => `<tr>
+    <td class="text-muted">${i + 1}</td>
+    <td><strong>${line}</strong></td>
+    <td class="s-num">${fmt(d.count)}</td>
+    <td class="s-num"><strong>${fmt(d.qty)}</strong></td>
+    <td>${[...d.models].sort().map(m => `<span class="badge badge-neutral">${m}</span>`).join(' ') || '—'}</td>
+  </tr>`).join('');
+
+  const gtCount = allRows.length;
+  const gtQty   = allRows.reduce((s, r) => s + r.qty, 0);
+  html += `<tr class="s-total">
+    <td colspan="2" style="padding:7px 12px;letter-spacing:.04em">TOTAL</td>
+    <td class="s-num">${fmt(gtCount)}</td>
+    <td class="s-num">${fmt(gtQty)}</td>
+    <td></td>
+  </tr>`;
+
+  body.innerHTML = html;
+}
+
+// ── Export ────────────────────────────────────────────────────────
+
+function exportRaw() {
+  const rows = getAllRows();
+  if (!rows.length) { BPMS.toast('Tidak ada data untuk diekspor', 'error'); return; }
+
+  const showPeriod = !currentPeriod;
+  const data = rows.map((r, i) => {
+    const row = {};
+    if (showPeriod) row['Periode'] = BPMS.formatPeriod(r._period);
+    row['No']               = i + 1;
+    row['Trx. Date']        = r.trxDate;
+    row['Trx. Time']        = r.trxTime;
+    row['WH']               = r.wh;
+    row['Trx Number']       = r.trxNumber;
+    row['Order No']         = r.orderNo;
+    row['Transaction Type'] = r.trxType;
+    row['Line']             = r.line;
+    row['Item']             = r.item;
+    row['Item Descriptions']= r.itemDesc;
+    row['Lot No']           = r.lotNo;
+    row['Model']            = r.model;
+    row['Qty']              = r.qty;
+    row['Information']      = r.information;
+    row['User']             = r.user;
+    row['ResCode']          = r.resCode;
+    return row;
+  });
+
+  const suffix = currentPeriod ? `_${currentPeriod}` : '_Semua';
+  const ws = XLSX.utils.json_to_sheet(data);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Data Produksi BaaN');
+  XLSX.writeFile(wb, `FAH_ProduksiBaaN${suffix}.xlsx`);
+  BPMS.toast('Export berhasil', 'success');
+}
+
+function exportSummary() {
+  const allRows = getAllRows();
+  if (!allRows.length) { BPMS.toast('Tidak ada data untuk diekspor', 'error'); return; }
+
+  const lineMap = new Map();
+  allRows.forEach(r => {
+    const key = r.line || '(Tidak Diketahui)';
+    if (!lineMap.has(key)) lineMap.set(key, { count: 0, qty: 0, models: new Set() });
+    const e = lineMap.get(key);
+    e.count++;
+    e.qty += r.qty;
+    if (r.model) e.models.add(r.model);
+  });
+
+  const sorted = [...lineMap.entries()].sort((a, b) => {
+    const na = parseInt(a[0]), nb = parseInt(b[0]);
+    if (!isNaN(na) && !isNaN(nb)) return na - nb;
+    return a[0].localeCompare(b[0]);
+  });
+
+  const data = sorted.map(([line, d], i) => ({
+    'No':              i + 1,
+    'Line':            line,
+    'Total Transaksi': d.count,
+    'Total Qty':       d.qty,
+    'Model':           [...d.models].sort().join(', '),
+  }));
+
+  const suffix = currentPeriod ? `_${currentPeriod}` : '_Semua';
+  const ws = XLSX.utils.json_to_sheet(data);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Summary per Line');
+  XLSX.writeFile(wb, `FAH_ProduksiBaaN_Summary${suffix}.xlsx`);
+  BPMS.toast('Export Summary berhasil', 'success');
+}
+
+function exportGenerated() {
+  const allRows = getAllRows();
+  if (!allRows.length) { BPMS.toast('Tidak ada data untuk diekspor', 'error'); return; }
+
+  const maps       = buildLookupMapsPI();
+  const showPeriod = !currentPeriod;
+
+  const data = allRows.map((r, i) => {
+    const g   = computeGenPiRow(r, maps);
+    const row = {};
+    if (showPeriod) row['Periode'] = BPMS.formatPeriod(r._period);
+    row['No']               = i + 1;
+    row['Date']             = r.trxDate;
+    row['Year']             = g.year;
+    row['WO']               = g.wo;
+    row['Code']             = g.code;
+    row['Item Battery']     = g.itemBattery;
+    row['Item Assy']        = g.itemAssy;
+    row['Qty Produksi']     = r.qty;
+    row['Code Battery']     = g.codeBattery;
+    row['Plate Positif']    = g.pnPos;
+    row['Grid Process (+)'] = g.gridPos;
+    row['Qty Plate (+)']    = g.qpPos;
+    row['Pule (+)']         = g.qPulePos;
+    row['Plate Negatif']    = g.pnNeg;
+    row['Grid Process (-)'] = g.gridNeg;
+    row['Qty Plate (-)']    = g.qpNeg;
+    row['Pule (-)']         = g.qPuleNeg;
+    return row;
+  });
+
+  const suffix = currentPeriod ? `_${currentPeriod}` : '_Semua';
+  const ws = XLSX.utils.json_to_sheet(data);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Generated Produksi BaaN');
+  XLSX.writeFile(wb, `FAH_ProduksiBaaN_Generated${suffix}.xlsx`);
+  BPMS.toast('Export Generated berhasil', 'success');
 }
 </script>
 </body>

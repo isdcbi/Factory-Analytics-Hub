@@ -116,7 +116,13 @@
         <div class="resume-toolbar">
           <span class="resume-title">Resume Produksi</span>
           <span class="resume-status" id="loadStatus"></span>
-          <button class="btn-secondary btn-sm" onclick="exportTable()">Export Excel</button>
+          <button class="btn btn-ghost btn-sm" id="reloadBtn" onclick="reloadResume()">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.5"/>
+            </svg>
+            Muat Ulang
+          </button>
+          <button class="btn btn-ghost btn-sm" onclick="exportTable()">Export Excel</button>
         </div>
 
         <div class="tbl-scroll">
@@ -169,7 +175,15 @@ const PiDB = (() => {
       req.onerror   = e => reject(e.target.error);
     });
   }
-  return { getPeriods, getData };
+  async function setData(period, rows) {
+    const db = await open();
+    return new Promise((resolve, reject) => {
+      const req = db.transaction(STORE, 'readwrite').objectStore(STORE).put(rows, period);
+      req.onsuccess = () => resolve(true);
+      req.onerror   = () => reject(req.error);
+    });
+  }
+  return { getPeriods, getData, setData };
 })();
 
 /* ── Table structure ── */
@@ -400,13 +414,47 @@ function computeGenPiRow(r, maps) {
 async function loadResumeData() {
   document.getElementById('loadStatus').textContent = 'Memuat data…';
   try {
-    const periods = await PiDB.getPeriods();
+    // Ambil daftar periode: server (primary) → IndexedDB (fallback)
+    let periods = [];
+    let serverAvailable = false;
+    try {
+      const r = await fetch('api/produksi-infor.php', { cache: 'no-store' });
+      if (r.ok) {
+        const j = await r.json();
+        if (j.ok && Array.isArray(j.periods)) { periods = j.periods; serverAvailable = true; }
+      }
+    } catch (_) {}
+    if (!periods.length) {
+      try { periods = await PiDB.getPeriods(); } catch (_) {}
+    }
+
     if (!periods.length) {
       document.getElementById('loadStatus').textContent = 'Belum ada data Produksi Infor.';
       return;
     }
 
-    const allRows = (await Promise.all(periods.map(p => PiDB.getData(p)))).flat();
+    // Ambil data tiap periode: server dulu (selalu fresh) → IndexedDB fallback
+    async function fetchPeriod(p) {
+      if (serverAvailable) {
+        try {
+          const r = await fetch('api/produksi-infor.php?period=' + p, { cache: 'no-store' });
+          if (r.ok) {
+            const j = await r.json();
+            if (j.ok && Array.isArray(j.data) && j.data.length) {
+              try { await PiDB.setData(p, j.data); } catch (_) {}
+              return j.data;
+            }
+          }
+        } catch (_) {}
+      }
+      try {
+        const cached = await PiDB.getData(p);
+        if (cached && cached.length) return cached;
+      } catch (_) {}
+      return [];
+    }
+
+    const allRows = (await Promise.all(periods.map(fetchPeriod))).flat();
     const maps    = buildLookupMapsPI();
 
     /* ── Assembling: SUM qty per year, hanya WO = PKAB / PKAS ── */
@@ -462,6 +510,136 @@ async function loadResumeData() {
       }
     }
 
+    /* ── Grid Punching Pos: SUM Qty Plate (+) per year
+          Filter: WO = PKAB/PKAS, Grid Process (+) = "Grid Punching" ── */
+    const gpPosYear = {};
+    for (const r of allRows) {
+      const g = computeGenPiRow(r, maps);
+      if (g.wo !== 'PKAB' && g.wo !== 'PKAS') continue;
+      if (g.gridPos !== 'Grid Punching') continue;
+      if (!/^\d{4}$/.test(g.year)) continue;
+      gpPosYear[g.year] = (gpPosYear[g.year] || 0) + g.qpPos;
+    }
+    for (const y of YEARS) {
+      const v = gpPosYear[String(y)];
+      if (v !== undefined) fillCell('gridPunching_pos', y, Math.round(v));
+    }
+
+    /* ── Grid Punching Neg: SUM Qty Plate (-) per year
+          Filter: WO = PKAB/PKAS, Grid Process (-) = "Grid Punching" ── */
+    const gpNegYear = {};
+    for (const r of allRows) {
+      const g = computeGenPiRow(r, maps);
+      if (g.wo !== 'PKAB' && g.wo !== 'PKAS') continue;
+      if (g.gridNeg !== 'Grid Punching') continue;
+      if (!/^\d{4}$/.test(g.year)) continue;
+      gpNegYear[g.year] = (gpNegYear[g.year] || 0) + g.qpNeg;
+    }
+    for (const y of YEARS) {
+      const v = gpNegYear[String(y)];
+      if (v !== undefined) fillCell('gridPunching_neg', y, Math.round(v));
+    }
+
+    /* ── Grid Punching Total: Pos + Neg ── */
+    for (const y of YEARS) {
+      const pos = gpPosYear[String(y)];
+      const neg = gpNegYear[String(y)];
+      if (pos !== undefined || neg !== undefined) {
+        fillCell('gridPunching_total', y, Math.round((pos || 0) + (neg || 0)));
+      }
+    }
+
+    /* ── Ball Mill Pos: SUM Pule (+) per year, WO = PKAB/PKAS ── */
+    const bmPosYear = {};
+    for (const r of allRows) {
+      const g = computeGenPiRow(r, maps);
+      if (g.wo !== 'PKAB' && g.wo !== 'PKAS') continue;
+      if (!/^\d{4}$/.test(g.year)) continue;
+      if (g.qPulePos) bmPosYear[g.year] = (bmPosYear[g.year] || 0) + g.qPulePos;
+    }
+    for (const y of YEARS) {
+      const v = bmPosYear[String(y)];
+      if (v !== undefined) fillCell('ballMill_pos', y, Math.round(v));
+    }
+
+    /* ── Ball Mill Neg: SUM Pule (-) per year, WO = PKAB/PKAS ── */
+    const bmNegYear = {};
+    for (const r of allRows) {
+      const g = computeGenPiRow(r, maps);
+      if (g.wo !== 'PKAB' && g.wo !== 'PKAS') continue;
+      if (!/^\d{4}$/.test(g.year)) continue;
+      if (g.qPuleNeg) bmNegYear[g.year] = (bmNegYear[g.year] || 0) + g.qPuleNeg;
+    }
+    for (const y of YEARS) {
+      const v = bmNegYear[String(y)];
+      if (v !== undefined) fillCell('ballMill_neg', y, Math.round(v));
+    }
+
+    /* ── Ball Mill Total: Pos + Neg ── */
+    for (const y of YEARS) {
+      const pos = bmPosYear[String(y)];
+      const neg = bmNegYear[String(y)];
+      if (pos !== undefined || neg !== undefined) {
+        fillCell('ballMill_total', y, Math.round((pos || 0) + (neg || 0)));
+      }
+    }
+
+    /* ── Pasting Casting: sama dengan Grid Casting (reuse gcPosYear / gcNegYear) ── */
+    for (const y of YEARS) {
+      const pos = gcPosYear[String(y)];
+      const neg = gcNegYear[String(y)];
+      if (pos !== undefined) fillCell('pastingCasting_pos',   y, Math.round(pos));
+      if (neg !== undefined) fillCell('pastingCasting_neg',   y, Math.round(neg));
+      if (pos !== undefined || neg !== undefined)
+        fillCell('pastingCasting_total', y, Math.round((pos || 0) + (neg || 0)));
+    }
+
+    /* ── Pasting Punching: sama dengan Grid Punching (reuse gpPosYear / gpNegYear) ── */
+    for (const y of YEARS) {
+      const pos = gpPosYear[String(y)];
+      const neg = gpNegYear[String(y)];
+      if (pos !== undefined) fillCell('pastingPunching_pos',   y, Math.round(pos));
+      if (neg !== undefined) fillCell('pastingPunching_neg',   y, Math.round(neg));
+      if (pos !== undefined || neg !== undefined)
+        fillCell('pastingPunching_total', y, Math.round((pos || 0) + (neg || 0)));
+    }
+
+    /* ── Formation Pos: SUM Qty Plate (+) per year, Code = 'D', WO = PKAB/PKAS ── */
+    const fmPosYear = {};
+    for (const r of allRows) {
+      const g = computeGenPiRow(r, maps);
+      if (g.wo !== 'PKAB' && g.wo !== 'PKAS') continue;
+      if (g.code !== 'D') continue;
+      if (!/^\d{4}$/.test(g.year)) continue;
+      fmPosYear[g.year] = (fmPosYear[g.year] || 0) + g.qpPos;
+    }
+    for (const y of YEARS) {
+      const v = fmPosYear[String(y)];
+      if (v !== undefined) fillCell('formation_pos', y, Math.round(v));
+    }
+
+    /* ── Formation Neg: SUM Qty Plate (-) per year, Code = 'D', WO = PKAB/PKAS ── */
+    const fmNegYear = {};
+    for (const r of allRows) {
+      const g = computeGenPiRow(r, maps);
+      if (g.wo !== 'PKAB' && g.wo !== 'PKAS') continue;
+      if (g.code !== 'D') continue;
+      if (!/^\d{4}$/.test(g.year)) continue;
+      fmNegYear[g.year] = (fmNegYear[g.year] || 0) + g.qpNeg;
+    }
+    for (const y of YEARS) {
+      const v = fmNegYear[String(y)];
+      if (v !== undefined) fillCell('formation_neg', y, Math.round(v));
+    }
+
+    /* ── Formation Total: Pos + Neg ── */
+    for (const y of YEARS) {
+      const pos = fmPosYear[String(y)];
+      const neg = fmNegYear[String(y)];
+      if (pos !== undefined || neg !== undefined)
+        fillCell('formation_total', y, Math.round((pos || 0) + (neg || 0)));
+    }
+
     document.getElementById('loadStatus').textContent =
       `Data dimuat: ${allRows.length.toLocaleString('id-ID')} record dari ${periods.length} periode.`;
   } catch (err) {
@@ -474,6 +652,16 @@ function exportTable() {
   if (typeof XLSX === 'undefined') { alert('Library XLSX belum dimuat'); return; }
   const wb = XLSX.utils.table_to_book(document.getElementById('resumeTable'), { sheet:'Resume' });
   XLSX.writeFile(wb, 'Resume_Produksi.xlsx');
+}
+
+/* ── Reload ── */
+async function reloadResume() {
+  const btn = document.getElementById('reloadBtn');
+  btn.disabled = true;
+  // Reset semua sel ke "—" sebelum hitung ulang
+  document.querySelectorAll('#resumeTbody td[data-year]').forEach(td => { td.textContent = '—'; });
+  await loadResumeData();
+  btn.disabled = false;
 }
 
 /* ── Init ── */
