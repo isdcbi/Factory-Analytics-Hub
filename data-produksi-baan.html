@@ -1194,10 +1194,10 @@ function computeGenPiRow(r, maps) {
     c[4] = 'W';
     itemBattery = c.join('');
   }
-  const itemDataInfor = item.substring(2, 19);
-  const codeBattery   = itemBattery.substring(2, 19);
+  const codeBattery = itemBattery.substring(2, 19);
   const year          = r.trxDate ? r.trxDate.slice(-4) : '';
-  const pv            = plateMap.get(itemDataInfor) || {};
+  // Lookup pakai codeBattery (prefix sudah dikonversi W→F,U→W)
+  const pv            = plateMap.get(codeBattery) || {};
   const pnPos         = pv.pnPos  || '';
   const qpPos         = (pv.qtyPos || 0) * qty;
   const pnNeg         = pv.pnNeg  || '';

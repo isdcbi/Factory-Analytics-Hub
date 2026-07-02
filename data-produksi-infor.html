@@ -229,6 +229,11 @@
           <div class="stat-value" id="statItems">—</div>
           <div class="stat-sub">Jenis item</div>
         </div>
+        <div class="stat-card">
+          <div class="stat-label">Unmapped</div>
+          <div class="stat-value" id="statUnmapped">—</div>
+          <div class="stat-sub">Plate tidak ditemukan</div>
+        </div>
       </div>
 
       <!-- Tab Navigation -->
@@ -314,22 +319,26 @@
                   <th>Year</th>
                   <th>WO</th>
                   <th>Code</th>
+                  <th>Category</th>
                   <th>Item Battery</th>
                   <th>Item Assy</th>
                   <th class="g-num">Qty Produksi</th>
                   <th>Code Battery</th>
+                  <th>Battery Type</th>
                   <th>Plate Positif</th>
+                  <th>Form Status (+)</th>
                   <th>Grid Process (+)</th>
                   <th class="g-num">Qty Plate (+)</th>
                   <th class="g-num">Pule (+)</th>
                   <th>Plate Negatif</th>
+                  <th>Form Status (-)</th>
                   <th>Grid Process (-)</th>
                   <th class="g-num">Qty Plate (-)</th>
                   <th class="g-num">Pule (-)</th>
                 </tr>
               </thead>
               <tbody id="genBody">
-                <tr><td colspan="17"><div class="empty-state">
+                <tr><td colspan="21"><div class="empty-state">
                   <div class="empty-icon">⚙️</div>
                   <div class="empty-title">Belum ada data produksi</div>
                   <div class="empty-text">Upload file Excel dan pilih periode untuk menampilkan data</div>
@@ -1082,11 +1091,24 @@ function renderTable() {
   const activeLines = new Set(filtered.map(r => r.line).filter(Boolean));
   const uniqueItems = new Set(filtered.map(r => r.item).filter(Boolean));
 
-  document.getElementById('statTotal').textContent  = filtered.length.toLocaleString();
-  document.getElementById('statQty').textContent    = totalQty.toLocaleString();
-  document.getElementById('statLines').textContent  = activeLines.size || '—';
-  document.getElementById('statItems').textContent  = uniqueItems.size || '—';
-  document.getElementById('piCount').textContent    = `${filtered.length.toLocaleString()} / ${allRows.length.toLocaleString()} record`;
+  // Hitung unmapped: baris yang codeBattery-nya tidak ada di plateMap
+  const { plateMap } = buildLookupMapsPI();
+  let unmappedCount = 0;
+  for (const r of filtered) {
+    const item = r.item || '';
+    let ib = item;
+    if (item.charAt(0) === 'W') {
+      const c = item.split(''); c[0] = 'F'; c[4] = 'W'; ib = c.join('');
+    }
+    if (!plateMap.has(ib.substring(2, 19))) unmappedCount++;
+  }
+
+  document.getElementById('statTotal').textContent    = filtered.length.toLocaleString();
+  document.getElementById('statQty').textContent      = totalQty.toLocaleString();
+  document.getElementById('statLines').textContent    = activeLines.size || '—';
+  document.getElementById('statItems').textContent    = uniqueItems.size || '—';
+  document.getElementById('statUnmapped').textContent = unmappedCount || '—';
+  document.getElementById('piCount').textContent      = `${filtered.length.toLocaleString()} / ${allRows.length.toLocaleString()} record`;
 
   if (!filtered.length) {
     body.innerHTML = `<tr><td colspan="16"><div class="empty-state">
@@ -1249,13 +1271,31 @@ function puleKeyPI(pn) {
   return pn.charAt(2) === 'F' ? 'W-UNPL-' + pn.substring(7) : pn;
 }
 
+// Derive Grid Process dari struktur PN Plate (fallback jika typeMap kosong)
+function gridProcessFromPN(pn) {
+  if (!pn) return '';
+  const parts = pn.split('-');
+  if (parts.length < 3) return '';
+  const c = parts[2].charAt(0);
+  if (c === 'W') return 'Grid Punching';
+  if (c === 'C' || c === 'D') return 'Grid Casting';
+  return 'Calcium Casting';
+}
+
 function computeGenPiRow(r, maps) {
   const { plateMap, typeMap, puLeMap } = maps;
   const item = r.item || '';
   const qty  = r.qty  || 0;
 
-  // Code: MID(item, 5, 1)
+  // Code: MID(item, 5, 1) — juga merupakan kode Category
   const code = item.charAt(4);
+
+  // Category: char ke-3 prefix PN Battery (posisi 4 pada item Infor)
+  const catMap = { D: 'DRY', W: 'WET', U: 'DUC' };
+  const category = catMap[code] || '';
+
+  // Battery Type: segmen ke-3 dari item Infor (F-PREFIX-BATTTYPE-...)
+  const batteryType = item.split('-')[2] || '';
 
   // Item Assy: field Item dari data produksi (apa adanya)
   const itemAssy = item;
@@ -1267,34 +1307,37 @@ function computeGenPiRow(r, maps) {
     c[4] = 'W';
     itemBattery = c.join('');
   }
-  // Key lookup plateMap tetap MID(item, 3, 17)
-  const itemDataInfor = item.substring(2, 19);
-
   // Code Battery: MID(itemBattery, 3, 17) = substring(2, 19)
   const codeBattery = itemBattery.substring(2, 19);
 
   // Year dari trxDate "DD/MM/YYYY"
   const year = r.trxDate ? r.trxDate.slice(-4) : '';
 
-  // Lookup Plate Infor (pakai itemDataInfor sebagai key)
-  const pv   = plateMap.get(itemDataInfor) || {};
-  const pnPos = pv.pnPos  || '';
+  // WO: 4 digit pertama dari Order No
+  const wo = String(r.orderNo || '').substring(0, 4);
+
+  // Lookup Plate Infor — pakai codeBattery (prefix sudah dikonversi W→F,U→W)
+  const pv    = plateMap.get(codeBattery) || {};
+  const pnPos = pv.pnPos || '';
   const qpPos = (pv.qtyPos || 0) * qty;
-  const pnNeg = pv.pnNeg  || '';
+  const pnNeg = pv.pnNeg || '';
   const qpNeg = (pv.qtyNeg || 0) * qty;
 
-  // Grid Process: MID(pn, 8, 4) → typeMap
-  const gridPos = typeMap.get(pnPos.substring(7, 11)) ?? '';
-  const gridNeg = typeMap.get(pnNeg.substring(7, 11)) ?? '';
+  // Form Status: segmen ke-2 dari PN Plate (FOPL / UNPL)
+  const formStatusPos = pnPos ? (pnPos.split('-')[1] || '') : '';
+  const formStatusNeg = pnNeg ? (pnNeg.split('-')[1] || '') : '';
+
+  // Grid Process: typeMap lookup (MID(pn,8,4)) → fallback dari struktur PN
+  const gridPos = typeMap.get(pnPos.substring(7, 11)) || gridProcessFromPN(pnPos);
+  const gridNeg = typeMap.get(pnNeg.substring(7, 11)) || gridProcessFromPN(pnNeg);
 
   // Qty Pule
   const qPulePos = Math.round((puLeMap.get(puleKeyPI(pnPos)) || 0) * qpPos);
   const qPuleNeg = Math.round((puLeMap.get(puleKeyPI(pnNeg)) || 0) * qpNeg);
 
-  // WO: 4 digit pertama dari Order No
-  const wo = String(r.orderNo || '').substring(0, 4);
-
-  return { code, wo, itemAssy, itemBattery, codeBattery, year, pnPos, gridPos, qpPos, qPulePos, pnNeg, gridNeg, qpNeg, qPuleNeg };
+  return { code, category, batteryType, wo, itemAssy, itemBattery, codeBattery, year,
+           pnPos, formStatusPos, gridPos, qpPos, qPulePos,
+           pnNeg, formStatusNeg, gridNeg, qpNeg, qPuleNeg };
 }
 
 function renderGenerated() {
@@ -1304,7 +1347,7 @@ function renderGenerated() {
 
   if (!allRows.length) {
     count.textContent = '0 record';
-    body.innerHTML = `<tr><td colspan="17"><div class="empty-state">
+    body.innerHTML = `<tr><td colspan="21"><div class="empty-state">
       <div class="empty-icon">⚙️</div>
       <div class="empty-title">Belum ada data produksi</div>
       <div class="empty-text">Upload file Excel dan pilih periode untuk menampilkan data</div>
@@ -1335,15 +1378,19 @@ function renderGenerated() {
         <td>${g.year || '—'}</td>
         <td>${dash(g.wo)}</td>
         <td class="g-item">${dash(g.code)}</td>
+        <td>${dash(g.category)}</td>
         <td class="g-item">${dash(g.itemBattery)}</td>
         <td class="g-item">${dash(g.itemAssy)}</td>
         <td class="g-qty">${num(r.qty)}</td>
         <td class="g-item">${dash(g.codeBattery)}</td>
+        <td class="g-item">${dash(g.batteryType)}</td>
         <td class="g-item">${dash(g.pnPos)}</td>
+        <td>${dash(g.formStatusPos)}</td>
         <td>${dash(g.gridPos)}</td>
         <td class="g-qty">${num(g.qpPos)}</td>
         <td class="g-qty">${num(g.qPulePos)}</td>
         <td class="g-item">${dash(g.pnNeg)}</td>
+        <td>${dash(g.formStatusNeg)}</td>
         <td>${dash(g.gridNeg)}</td>
         <td class="g-qty">${num(g.qpNeg)}</td>
         <td class="g-qty">${num(g.qPuleNeg)}</td>`;
@@ -1496,23 +1543,27 @@ function exportGenerated() {
     const g = computeGenPiRow(r, maps);
     const row = {};
     if (showPeriod) row['Periode'] = BPMS.formatPeriod(r._period);
-    row['No']             = i + 1;
-    row['Date']           = r.trxDate;
-    row['Year']           = g.year;
-    row['WO']             = g.wo;
-    row['Code']           = g.code;
-    row['Item Battery']   = g.itemBattery;
-    row['Item Assy']      = g.itemAssy;
-    row['Qty Produksi']   = r.qty;
-    row['Code Battery']   = g.codeBattery;
-    row['Plate Positif']  = g.pnPos;
+    row['No']               = i + 1;
+    row['Date']             = r.trxDate;
+    row['Year']             = g.year;
+    row['WO']               = g.wo;
+    row['Code']             = g.code;
+    row['Category']         = g.category;
+    row['Item Battery']     = g.itemBattery;
+    row['Item Assy']        = g.itemAssy;
+    row['Qty Produksi']     = r.qty;
+    row['Code Battery']     = g.codeBattery;
+    row['Battery Type']     = g.batteryType;
+    row['Plate Positif']    = g.pnPos;
+    row['Form Status (+)']  = g.formStatusPos;
     row['Grid Process (+)'] = g.gridPos;
-    row['Qty Plate (+)']  = g.qpPos;
-    row['Pule (+)']       = g.qPulePos;
-    row['Plate Negatif']  = g.pnNeg;
+    row['Qty Plate (+)']    = g.qpPos;
+    row['Pule (+)']         = g.qPulePos;
+    row['Plate Negatif']    = g.pnNeg;
+    row['Form Status (-)']  = g.formStatusNeg;
     row['Grid Process (-)'] = g.gridNeg;
-    row['Qty Plate (-)']  = g.qpNeg;
-    row['Pule (-)']       = g.qPuleNeg;
+    row['Qty Plate (-)']    = g.qpNeg;
+    row['Pule (-)']         = g.qPuleNeg;
     return row;
   });
 

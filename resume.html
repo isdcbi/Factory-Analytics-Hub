@@ -36,7 +36,7 @@
     }
     .tbl-resume th,
     .tbl-resume td {
-      border: 1px solid var(--border, #d8dde6);
+      border: 1px solid #b0bac8;
       padding: 5px 10px;
       white-space: nowrap;
     }
@@ -47,6 +47,13 @@
       position: sticky;
       top: 0;
       z-index: 3;
+      border-bottom: 2px solid #7a8699;
+    }
+
+    /* Garis tebal sebagai pemisah antar grup/baris */
+    .tbl-resume tr.row-group-start td,
+    .tbl-resume tr.row-single td {
+      border-top: 2px solid #8895a7;
     }
     .tbl-resume thead th.col-proses {
       text-align: left;
@@ -295,7 +302,7 @@ function buildTable() {
         const groupTd = i === 0
           ? `<td class="cell-group" rowspan="${item.rows.length}">${item.label}</td>`
           : '';
-        const trClass = sr.isTotal ? 'row-total' : sr.isBattery ? 'row-battery' : '';
+        const trClass = [i === 0 ? 'row-group-start' : '', sr.isTotal ? 'row-total' : sr.isBattery ? 'row-battery' : ''].filter(Boolean).join(' ');
         parts.push(`<tr class="${trClass}" data-rowkey="${rk}">
           ${groupTd}
           <td class="cell-sub">${sr.sub}</td>
@@ -380,6 +387,16 @@ function puleKeyPI(pn) {
   return pn.charAt(2) === 'F' ? 'W-UNPL-' + pn.substring(7) : pn;
 }
 
+function gridProcessFromPN(pn) {
+  if (!pn) return '';
+  const parts = pn.split('-');
+  if (parts.length < 3) return '';
+  const c = parts[2].charAt(0);
+  if (c === 'W') return 'Grid Punching';
+  if (c === 'C' || c === 'D') return 'Grid Casting';
+  return 'Calcium Casting';
+}
+
 function computeGenPiRow(r, maps) {
   const { plateMap, typeMap, puLeMap } = maps;
   const item = r.item || '';
@@ -392,17 +409,17 @@ function computeGenPiRow(r, maps) {
     c[0] = 'F'; c[4] = 'W';
     itemBattery = c.join('');
   }
-  const itemDataInfor = item.substring(2, 19);
   const codeBattery   = itemBattery.substring(2, 19);
   const year          = r.trxDate ? r.trxDate.slice(-4) : '';
   const wo            = String(r.orderNo || '').substring(0, 4);
-  const pv    = plateMap.get(itemDataInfor) || {};
+  // Lookup pakai codeBattery (prefix sudah dikonversi W→F,U→W)
+  const pv    = plateMap.get(codeBattery) || {};
   const pnPos = pv.pnPos  || '';
   const qpPos = (pv.qtyPos || 0) * qty;
   const pnNeg = pv.pnNeg  || '';
   const qpNeg = (pv.qtyNeg || 0) * qty;
-  const gridPos = typeMap.get(pnPos.substring(7, 11)) ?? '';
-  const gridNeg = typeMap.get(pnNeg.substring(7, 11)) ?? '';
+  const gridPos = typeMap.get(pnPos.substring(7, 11)) || gridProcessFromPN(pnPos);
+  const gridNeg = typeMap.get(pnNeg.substring(7, 11)) || gridProcessFromPN(pnNeg);
   const qPulePos = Math.round((puLeMap.get(puleKeyPI(pnPos)) || 0) * qpPos);
   const qPuleNeg = Math.round((puLeMap.get(puleKeyPI(pnNeg)) || 0) * qpNeg);
   return { wo, code, itemAssy, itemBattery, codeBattery, year,
@@ -638,6 +655,47 @@ async function loadResumeData() {
       const neg = fmNegYear[String(y)];
       if (pos !== undefined || neg !== undefined)
         fillCell('formation_total', y, Math.round((pos || 0) + (neg || 0)));
+    }
+
+    /* ── Plate/battery: (Grid Casting Total + Grid Punching Total) / Assembling ── */
+    for (const y of YEARS) {
+      const asm = assemblingByYear[String(y)];
+      if (!asm) continue;
+      const gcTotal = (gcPosYear[String(y)] || 0) + (gcNegYear[String(y)] || 0);
+      const gpTotal = (gpPosYear[String(y)] || 0) + (gpNegYear[String(y)] || 0);
+      const val = (gcTotal + gpTotal) / asm;
+      const td  = document.querySelector(`td[data-rowkey="plateBattery"][data-year="${y}"]`);
+      if (!td) continue;
+      td.textContent = val.toLocaleString('id-ID', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+      td.classList.add('has-data');
+    }
+
+    /* ── Berat lead/battery: Ball Mill Total / Assembling ── */
+    for (const y of YEARS) {
+      const asm = assemblingByYear[String(y)];
+      if (!asm) continue;
+      const bmTotal = (bmPosYear[String(y)] || 0) + (bmNegYear[String(y)] || 0);
+      if (!bmTotal) continue;
+      const val = bmTotal / asm;
+      const td  = document.querySelector(`td[data-rowkey="beratLeadBattery"][data-year="${y}"]`);
+      if (!td) continue;
+      td.textContent = val.toLocaleString('id-ID', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+      td.classList.add('has-data');
+    }
+
+    /* ── Berat lead/panel: Ball Mill Total / (Grid Casting Total + Grid Punching Total) ── */
+    for (const y of YEARS) {
+      const gcTotal = (gcPosYear[String(y)] || 0) + (gcNegYear[String(y)] || 0);
+      const gpTotal = (gpPosYear[String(y)] || 0) + (gpNegYear[String(y)] || 0);
+      const divisor = gcTotal + gpTotal;
+      if (!divisor) continue;
+      const bmTotal = (bmPosYear[String(y)] || 0) + (bmNegYear[String(y)] || 0);
+      if (!bmTotal) continue;
+      const val = bmTotal / divisor;
+      const td  = document.querySelector(`td[data-rowkey="beratLeadPanel"][data-year="${y}"]`);
+      if (!td) continue;
+      td.textContent = val.toLocaleString('id-ID', { minimumFractionDigits: 3, maximumFractionDigits: 3 });
+      td.classList.add('has-data');
     }
 
     document.getElementById('loadStatus').textContent =
