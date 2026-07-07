@@ -7,7 +7,7 @@
   <link rel="stylesheet" href="style.css"/>
   <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
   <style>
-    .resume-wrap { padding: 0 24px 48px; }
+    .resume-wrap { padding: 0 12px 48px; }
 
     .resume-toolbar {
       display: flex;
@@ -32,12 +32,12 @@
       border-collapse: collapse;
       width: max-content;
       min-width: 100%;
-      font-size: 12.5px;
+      font-size: 11.5px;
     }
     .tbl-resume th,
     .tbl-resume td {
       border: 1px solid #b0bac8;
-      padding: 5px 10px;
+      padding: 3px 6px;
       white-space: nowrap;
     }
     .tbl-resume thead th {
@@ -57,14 +57,15 @@
     }
     .tbl-resume thead th.col-proses {
       text-align: left;
-      min-width: 170px;
+      min-width: 130px;
+      max-width: 130px;
       position: sticky;
       left: 0;
       z-index: 4;
     }
-    .tbl-resume thead th.col-sub  { min-width: 80px;  position: sticky; left: 170px; z-index: 4; }
-    .tbl-resume thead th.col-unit { min-width: 65px;  position: sticky; left: 250px; z-index: 4; }
-    .tbl-resume thead th.col-year { min-width: 100px; }
+    .tbl-resume thead th.col-sub  { min-width: 58px; max-width: 58px; position: sticky; left: 130px; z-index: 4; }
+    .tbl-resume thead th.col-unit { min-width: 46px; max-width: 46px; position: sticky; left: 188px; z-index: 4; }
+    .tbl-resume thead th.col-year { min-width: 66px; }
 
     .tbl-resume tbody td.cell-group {
       position: sticky;
@@ -76,14 +77,14 @@
     }
     .tbl-resume tbody td.cell-sub {
       position: sticky;
-      left: 170px;
+      left: 130px;
       z-index: 1;
       background: #fff;
       color: var(--text-secondary, #666);
     }
     .tbl-resume tbody td.cell-unit {
       position: sticky;
-      left: 250px;
+      left: 188px;
       z-index: 1;
       background: #fff;
       text-align: center;
@@ -178,6 +179,45 @@ const PiDB = (() => {
     return new Promise((resolve, reject) => {
       const tx  = db.transaction(STORE, 'readonly');
       const req = tx.objectStore(STORE).get(period);
+      req.onsuccess = e => resolve(e.target.result || []);
+      req.onerror   = e => reject(e.target.error);
+    });
+  }
+  async function setData(period, rows) {
+    const db = await open();
+    return new Promise((resolve, reject) => {
+      const req = db.transaction(STORE, 'readwrite').objectStore(STORE).put(rows, period);
+      req.onsuccess = () => resolve(true);
+      req.onerror   = () => reject(req.error);
+    });
+  }
+  return { getPeriods, getData, setData };
+})();
+
+const PiBaanDB = (() => {
+  const DB_NAME = 'bpms_produksi_baan';
+  const DB_VER  = 1;
+  const STORE   = 'periods';
+  function open() {
+    return new Promise((resolve, reject) => {
+      const req = indexedDB.open(DB_NAME, DB_VER);
+      req.onupgradeneeded = e => e.target.result.createObjectStore(STORE);
+      req.onsuccess = e => resolve(e.target.result);
+      req.onerror   = e => reject(e.target.error);
+    });
+  }
+  async function getPeriods() {
+    const db = await open();
+    return new Promise((resolve, reject) => {
+      const req = db.transaction(STORE, 'readonly').objectStore(STORE).getAllKeys();
+      req.onsuccess = e => resolve(e.target.result || []);
+      req.onerror   = e => reject(e.target.error);
+    });
+  }
+  async function getData(period) {
+    const db = await open();
+    return new Promise((resolve, reject) => {
+      const req = db.transaction(STORE, 'readonly').objectStore(STORE).get(period);
       req.onsuccess = e => resolve(e.target.result || []);
       req.onerror   = e => reject(e.target.error);
     });
@@ -427,6 +467,44 @@ function computeGenPiRow(r, maps) {
            pnNeg, gridNeg, qpNeg, qPuleNeg };
 }
 
+/* ── BaaN data loader (Generated format, server-first → IndexedDB fallback) ── */
+async function loadBaanRows() {
+  let periods = [];
+  let serverAvailable = false;
+  try {
+    const r = await fetch('api/produksi-baan.php', { cache: 'no-store' });
+    if (r.ok) {
+      const j = await r.json();
+      if (j.ok && Array.isArray(j.periods)) { periods = j.periods; serverAvailable = true; }
+    }
+  } catch (_) {}
+  if (!periods.length) {
+    try { periods = await PiBaanDB.getPeriods(); } catch (_) {}
+  }
+  if (!periods.length) return [];
+
+  const results = await Promise.all(periods.map(async p => {
+    if (serverAvailable) {
+      try {
+        const r = await fetch('api/produksi-baan.php?period=' + p, { cache: 'no-store' });
+        if (r.ok) {
+          const j = await r.json();
+          if (j.ok && Array.isArray(j.data) && j.data.length) {
+            try { await PiBaanDB.setData(p, j.data); } catch (_) {}
+            return j.data;
+          }
+        }
+      } catch (_) {}
+    }
+    try {
+      const cached = await PiBaanDB.getData(p);
+      if (cached && cached.length) return cached;
+    } catch (_) {}
+    return [];
+  }));
+  return results.flat();
+}
+
 /* ── Data loading & computation ── */
 async function loadResumeData() {
   document.getElementById('loadStatus').textContent = 'Memuat data…';
@@ -443,11 +521,6 @@ async function loadResumeData() {
     } catch (_) {}
     if (!periods.length) {
       try { periods = await PiDB.getPeriods(); } catch (_) {}
-    }
-
-    if (!periods.length) {
-      document.getElementById('loadStatus').textContent = 'Belum ada data Produksi Infor.';
-      return;
     }
 
     // Ambil data tiap periode: server dulu (selalu fresh) → IndexedDB fallback
@@ -471,7 +544,15 @@ async function loadResumeData() {
       return [];
     }
 
-    const allRows = (await Promise.all(periods.map(fetchPeriod))).flat();
+    const [allRows, baanRows] = await Promise.all([
+      periods.length ? Promise.all(periods.map(fetchPeriod)).then(r => r.flat()) : Promise.resolve([]),
+      loadBaanRows(),
+    ]);
+
+    if (!allRows.length && !baanRows.length) {
+      document.getElementById('loadStatus').textContent = 'Belum ada data Produksi Infor maupun BaaN.';
+      return;
+    }
     const maps    = buildLookupMapsPI();
 
     /* ── Assembling: SUM qty per year, hanya WO = PKAB / PKAS ── */
@@ -657,6 +738,74 @@ async function loadResumeData() {
         fillCell('formation_total', y, Math.round((pos || 0) + (neg || 0)));
     }
 
+    /* ── BaaN: build accumulator maps (Generated format, tanpa filter WO) ── */
+    for (const r of baanRows) {
+      const y = String(r.year || '');
+      if (!/^\d{4}$/.test(y)) continue;
+
+      // Assembling BaaN: SUM qtyProduksi
+      assemblingByYear[y] = (assemblingByYear[y] || 0) + (Number(r.qtyProduksi) || 0);
+
+      // Grid Casting
+      if (r.gridPos === 'Grid Casting') gcPosYear[y] = (gcPosYear[y] || 0) + (Number(r.qpPos) || 0);
+      if (r.gridNeg === 'Grid Casting') gcNegYear[y] = (gcNegYear[y] || 0) + (Number(r.qpNeg) || 0);
+
+      // Grid Punching
+      if (r.gridPos === 'Grid Punching') gpPosYear[y] = (gpPosYear[y] || 0) + (Number(r.qpPos) || 0);
+      if (r.gridNeg === 'Grid Punching') gpNegYear[y] = (gpNegYear[y] || 0) + (Number(r.qpNeg) || 0);
+
+      // Ball Mill: SUM Pule (+/-)
+      if (r.qPulePos) bmPosYear[y] = (bmPosYear[y] || 0) + (Number(r.qPulePos) || 0);
+      if (r.qPuleNeg) bmNegYear[y] = (bmNegYear[y] || 0) + (Number(r.qPuleNeg) || 0);
+
+      // Formation: hanya Code = 'D'
+      if (r.code === 'D') {
+        fmPosYear[y] = (fmPosYear[y] || 0) + (Number(r.qpPos) || 0);
+        fmNegYear[y] = (fmNegYear[y] || 0) + (Number(r.qpNeg) || 0);
+      }
+    }
+
+    /* ── Re-fill Grid Casting / Grid Punching / Ball Mill / Formation Total dengan data gabungan ── */
+    for (const y of YEARS) {
+      const gcPos = gcPosYear[String(y)]; const gcNeg = gcNegYear[String(y)];
+      const gpPos = gpPosYear[String(y)]; const gpNeg = gpNegYear[String(y)];
+      const bmPos = bmPosYear[String(y)]; const bmNeg = bmNegYear[String(y)];
+      const fmPos = fmPosYear[String(y)]; const fmNeg = fmNegYear[String(y)];
+
+      if (gcPos !== undefined) fillCell('gridCasting_pos',   y, Math.round(gcPos));
+      if (gcNeg !== undefined) fillCell('gridCasting_neg',   y, Math.round(gcNeg));
+      if (gcPos !== undefined || gcNeg !== undefined)
+        fillCell('gridCasting_total', y, Math.round((gcPos || 0) + (gcNeg || 0)));
+
+      if (gpPos !== undefined) fillCell('gridPunching_pos',  y, Math.round(gpPos));
+      if (gpNeg !== undefined) fillCell('gridPunching_neg',  y, Math.round(gpNeg));
+      if (gpPos !== undefined || gpNeg !== undefined)
+        fillCell('gridPunching_total', y, Math.round((gpPos || 0) + (gpNeg || 0)));
+
+      if (bmPos !== undefined) fillCell('ballMill_pos',   y, Math.round(bmPos));
+      if (bmNeg !== undefined) fillCell('ballMill_neg',   y, Math.round(bmNeg));
+      if (bmPos !== undefined || bmNeg !== undefined)
+        fillCell('ballMill_total', y, Math.round((bmPos || 0) + (bmNeg || 0)));
+
+      if (gcPos !== undefined) fillCell('pastingCasting_pos',   y, Math.round(gcPos));
+      if (gcNeg !== undefined) fillCell('pastingCasting_neg',   y, Math.round(gcNeg));
+      if (gcPos !== undefined || gcNeg !== undefined)
+        fillCell('pastingCasting_total', y, Math.round((gcPos || 0) + (gcNeg || 0)));
+
+      if (gpPos !== undefined) fillCell('pastingPunching_pos',  y, Math.round(gpPos));
+      if (gpNeg !== undefined) fillCell('pastingPunching_neg',  y, Math.round(gpNeg));
+      if (gpPos !== undefined || gpNeg !== undefined)
+        fillCell('pastingPunching_total', y, Math.round((gpPos || 0) + (gpNeg || 0)));
+
+      if (fmPos !== undefined) fillCell('formation_pos',   y, Math.round(fmPos));
+      if (fmNeg !== undefined) fillCell('formation_neg',   y, Math.round(fmNeg));
+      if (fmPos !== undefined || fmNeg !== undefined)
+        fillCell('formation_total', y, Math.round((fmPos || 0) + (fmNeg || 0)));
+
+      const asm = assemblingByYear[String(y)];
+      if (asm !== undefined) fillCell('assembling', y, Math.round(asm));
+    }
+
     /* ── Plate/battery: (Grid Casting Total + Grid Punching Total) / Assembling ── */
     for (const y of YEARS) {
       const asm = assemblingByYear[String(y)];
@@ -698,8 +847,32 @@ async function loadResumeData() {
       td.classList.add('has-data');
     }
 
+    /* ── Battery sub-rows ── */
+    for (const y of YEARS) {
+      const asm     = assemblingByYear[String(y)] || 0;
+      const gcTotal = (gcPosYear[String(y)] || 0) + (gcNegYear[String(y)] || 0);
+      const gpTotal = (gpPosYear[String(y)] || 0) + (gpNegYear[String(y)] || 0);
+      const bmTotal = (bmPosYear[String(y)] || 0) + (bmNegYear[String(y)] || 0);
+      const fmTotal = (fmPosYear[String(y)] || 0) + (fmNegYear[String(y)] || 0);
+
+      const plateBattery     = asm ? (gcTotal + gpTotal) / asm : 0;  // Plate/battery
+      const beratLeadBattery = asm ? bmTotal / asm : 0;               // Berat lead/battery
+
+      if (plateBattery) {
+        fillCell('gridCasting_battery',   y, Math.round(gcTotal / plateBattery));
+        fillCell('gridPunching_battery',  y, Math.round(gpTotal / plateBattery));
+        fillCell('pastingCasting_battery', y, Math.round(gcTotal / plateBattery));
+        fillCell('pastingPunching_battery', y, Math.round(gpTotal / plateBattery));
+        if (fmTotal) fillCell('formation_battery', y, Math.round(fmTotal / plateBattery));
+      }
+
+      if (beratLeadBattery && bmTotal) {
+        fillCell('ballMill_battery', y, Math.round(bmTotal / beratLeadBattery));
+      }
+    }
+
     document.getElementById('loadStatus').textContent =
-      `Data dimuat: ${allRows.length.toLocaleString('id-ID')} record dari ${periods.length} periode.`;
+      `Infor: ${allRows.length.toLocaleString('id-ID')} record (${periods.length} periode) · BaaN: ${baanRows.length.toLocaleString('id-ID')} record`;
   } catch (err) {
     document.getElementById('loadStatus').textContent = `Gagal memuat data: ${err.message}`;
   }

@@ -1,7 +1,7 @@
 # Factory Analytics Hub (FAH) — Current State & Activity Log
 
 **Project:** Factory Analytics Hub (FAH) v1.0  
-**Last Updated:** 2026-06-30  
+**Last Updated:** 2026-07-07  
 **Stack:** HTML5 + Vanilla JS + PHP (state.php) + SheetJS
 
 ---
@@ -22,7 +22,7 @@
 | PA — Dashboard | `pa-dashboard.html` | 🔲 Stub (Parameter Asumsi) |
 | PA — Resume | `resume.html` | 🔶 Tabel struktur selesai (data kosong) |
 | PA — Data Produksi Infor | `data-produksi-infor.html` | ✅ Selesai (upload Excel, tab Data + Summary, filter, export) |
-| PA — Data Produksi BaaN | `data-produksi-baan.html` | ✅ Selesai (struktur identik dengan Infor, siap disesuaikan) |
+| PA — Data Produksi BaaN | `data-produksi-baan.html` | ✅ Selesai (redesign v2 — upload langsung 20-kol Generated format) |
 | Shared Components | `shared-components.js` | ✅ Selesai |
 | Stylesheet | `style.css` | ✅ Selesai |
 | Backend API | `api/state.php` | ✅ Selesai |
@@ -33,6 +33,11 @@
 ---
 
 ## Activity Log
+
+### 2026-07-07
+- **data-produksi-baan.html** — Redesign penuh (v2). Tab "Data Produksi" dihapus. Upload sekarang langsung membaca format **Generated Data 20 kolom** (Date, Year, WO, Code, Category, Item Battery, Item Assy, Qty Produksi, Code Battery, Battery Type, Plate Positif, Form Status (+), Grid Process (+), Qty Plate (+), Pule (+), Plate Negatif, Form Status (-), Grid Process (-), Qty Plate (-), Pule (-)). Tidak ada komputasi dari raw data — data disimpan dan ditampilkan as-is. Deteksi periode dari kolom Date (Excel serial → DD/MM/YYYY via SheetJS cellDates:true). Stat cards: Total Record, Total Qty Produksi, Unique Code Battery, Total Qty Plate. Preview 200 baris sebelum simpan. Export langsung kolom stored data. Semua logika komputasi (computeGenPiRow, buildLookupMapsPI, puleKeyPI, dll) dihapus. Storage pattern identik dengan Infor: memory cache → IndexedDB → server. Tombol "Hapus Periode" / "Hapus Semua Periode" toggle sesuai pilihan periode (updateDeleteButtons). deleteAllPeriods() ditambahkan.
+- **resume.html** — Kolom Resume Produksi: Plate/battery, Berat lead/battery, Berat lead/panel, 6 baris Battery. Data sekarang gabungan Infor + BaaN: `PiBaanDB` + `loadBaanRows()` ditambahkan. BaaN menggunakan field langsung (tidak melalui computeGenPiRow), tanpa filter WO. Setelah Infor accumulator dibangun, BaaN di-merge ke map yang sama, lalu semua cell di-refill dengan nilai gabungan. Status bar menampilkan jumlah record dari kedua sumber. Tabel dipadatkan agar tidak scroll horizontal saat sidebar terbuka: font 12.5→11.5px, padding sel 5×10→3×6, kolom Proses 170→130px, Sub 80→58px, Satuan 65→46px, kolom tahun 100→66px, padding wrapper 24→12px (offset sticky ikut disesuaikan).
+- **data-produksi-infor.html** — Kolom Generated: Category, Battery Type, Form Status (+), Form Status (-) ditambahkan. Fallback Grid Process dari PN jika typeMap tidak ada. Plateap key difix ke codeBattery (bukan itemDataInfor). Card UNMAPPED ditambahkan.
 
 ### 2026-06-30
 - **api/orders.php** — API baru untuk Data Order, identik pola dengan `api/produksi-infor.php`. Endpoint: GET (list periods), GET `?period=YYYY-MM` (data), POST `{period, data}` (save), DELETE `?period=YYYY-MM` (hapus). Simpan di `data/orders/YYYY-MM.json`. Direktori dibuat otomatis jika belum ada.
