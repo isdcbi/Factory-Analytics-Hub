@@ -5,6 +5,87 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Dashboard Parameter Asumsi — Factory Analytics Hub</title>
   <link rel="stylesheet" href="style.css"/>
+  <style>
+    /* Chart chrome — palet dataviz (light) */
+    .pa-root {
+      --series-1:   #2a78d6;  /* biru  — Grid Casting / seri utama */
+      --series-2:   #1baf7a;  /* aqua  — Grid Punching */
+      --ink-muted:  #6c717d;
+      --gridline:   #e9eaef;
+      --baseline:   #c9ccd6;
+      --spark:      #c9ccd6;
+    }
+
+    .pa-toolbar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+    .pa-status { font-size: 12px; color: var(--text-3); margin-left: auto; }
+
+    /* KPI tiles */
+    .kpi-value-row { display: flex; align-items: baseline; gap: 6px; }
+    .kpi-unit  { font-size: 12px; color: var(--text-4); }
+    .kpi-delta { font-size: 11px; margin-top: 4px; color: var(--text-3); }
+    .kpi-delta.up   { color: var(--green); }
+    .kpi-delta.down { color: var(--red); }
+    .kpi-spark { margin-top: 8px; display: block; }
+
+    /* Chart cards */
+    .pa-grid-3 {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    .pa-grid-2 {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    .chart-card { position: relative; }
+    .chart-sub  { font-size: 11px; color: var(--text-4); margin: -12px 0 10px; }
+    .chart-svg  { width: 100%; height: auto; display: block; }
+
+    .chart-legend {
+      display: flex;
+      gap: 16px;
+      font-size: 11.5px;
+      color: var(--text-2);
+      margin-bottom: 8px;
+    }
+    .chart-legend .lg-item { display: flex; align-items: center; gap: 6px; }
+    .chart-legend .lg-swatch { width: 10px; height: 10px; border-radius: 2px; }
+
+    /* Tooltip */
+    .pa-tooltip {
+      position: fixed;
+      z-index: 60;
+      pointer-events: none;
+      background: var(--bg-1);
+      border: 1px solid var(--border-solid2);
+      border-radius: 6px;
+      box-shadow: 0 4px 14px rgba(0,0,0,0.12);
+      padding: 8px 10px;
+      font-size: 12px;
+      min-width: 130px;
+      display: none;
+    }
+    .pa-tooltip .tt-title { font-weight: 600; color: var(--text-1); margin-bottom: 4px; }
+    .pa-tooltip .tt-row   { display: flex; align-items: center; gap: 6px; margin-top: 2px; }
+    .pa-tooltip .tt-key   { width: 12px; height: 0; border-top: 3px solid; border-radius: 2px; flex-shrink: 0; }
+    .pa-tooltip .tt-val   { font-weight: 600; color: var(--text-1); font-variant-numeric: tabular-nums; }
+    .pa-tooltip .tt-lbl   { color: var(--text-3); }
+
+    .pa-footnote { font-size: 12px; color: var(--text-3); margin-top: 4px; }
+    .pa-footnote a { color: var(--accent); text-decoration: none; }
+    .pa-footnote a:hover { text-decoration: underline; }
+
+    text.ax { font-family: 'Inter', system-ui, sans-serif; font-size: 10.5px; fill: var(--ink-muted); font-variant-numeric: tabular-nums; }
+    text.dl { font-family: 'Inter', system-ui, sans-serif; font-size: 10.5px; fill: var(--text-2); font-weight: 600; }
+  </style>
 </head>
 <body>
 <div class="app-layout">
@@ -14,19 +95,818 @@
     <div id="topbarMount"></div>
 
     <div class="page-body">
-      <div class="empty-state" style="margin-top:80px">
-        <div class="empty-icon">📋</div>
-        <div class="empty-title">Dashboard Parameter Asumsi</div>
-        <div class="empty-text">Halaman ini sedang dalam pengembangan.</div>
+      <div class="pa-root">
+
+        <div class="pa-toolbar">
+          <span class="pa-status" id="loadStatus"></span>
+          <button class="btn btn-ghost btn-sm" id="reloadBtn">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.5"/>
+            </svg>
+            Muat Ulang
+          </button>
+        </div>
+
+        <!-- KPI row -->
+        <div class="stats-grid" id="kpiRow" style="grid-template-columns:repeat(auto-fit,minmax(200px,1fr))">
+          <div class="stat-card">
+            <div class="stat-label">Plate/Battery</div>
+            <div class="kpi-value-row"><span class="stat-value" id="kpiPlate">—</span><span class="kpi-unit">panel</span></div>
+            <div class="kpi-delta" id="kpiPlateDelta"></div>
+            <svg class="kpi-spark" id="sparkPlate" width="160" height="28"></svg>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Berat Lead/Battery</div>
+            <div class="kpi-value-row"><span class="stat-value" id="kpiLeadBat">—</span><span class="kpi-unit">kg</span></div>
+            <div class="kpi-delta" id="kpiLeadBatDelta"></div>
+            <svg class="kpi-spark" id="sparkLeadBat" width="160" height="28"></svg>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Berat Lead/Panel</div>
+            <div class="kpi-value-row"><span class="stat-value" id="kpiLeadPanel">—</span><span class="kpi-unit">kg</span></div>
+            <div class="kpi-delta" id="kpiLeadPanelDelta"></div>
+            <svg class="kpi-spark" id="sparkLeadPanel" width="160" height="28"></svg>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Assembling</div>
+            <div class="kpi-value-row"><span class="stat-value" id="kpiAsm">—</span><span class="kpi-unit">pcs</span></div>
+            <div class="kpi-delta" id="kpiAsmDelta"></div>
+            <svg class="kpi-spark" id="sparkAsm" width="160" height="28"></svg>
+          </div>
+        </div>
+
+        <!-- Parameter trends: small multiples -->
+        <div class="pa-grid-3">
+          <div class="card chart-card">
+            <div class="card-header"><span class="card-title">Plate/Battery per Tahun</span></div>
+            <div class="chart-sub">panel per battery</div>
+            <div id="chartPlate"></div>
+          </div>
+          <div class="card chart-card">
+            <div class="card-header"><span class="card-title">Berat Lead/Battery per Tahun</span></div>
+            <div class="chart-sub">kg per battery</div>
+            <div id="chartLeadBat"></div>
+          </div>
+          <div class="card chart-card">
+            <div class="card-header"><span class="card-title">Berat Lead/Panel per Tahun</span></div>
+            <div class="chart-sub">kg per panel</div>
+            <div id="chartLeadPanel"></div>
+          </div>
+        </div>
+
+        <!-- Volume charts -->
+        <div class="pa-grid-2">
+          <div class="card chart-card">
+            <div class="card-header"><span class="card-title">Volume Plate per Tahun</span></div>
+            <div class="chart-sub">panel (Qty Plate + dan −)</div>
+            <div class="chart-legend">
+              <span class="lg-item"><span class="lg-swatch" style="background:var(--series-1)"></span>Grid Casting</span>
+              <span class="lg-item"><span class="lg-swatch" style="background:var(--series-2)"></span>Grid Punching</span>
+            </div>
+            <div id="chartVolume"></div>
+          </div>
+          <div class="card chart-card">
+            <div class="card-header"><span class="card-title">Assembling per Tahun</span></div>
+            <div class="chart-sub">pcs battery (WO PKAB/PKAS + BaaN)</div>
+            <div id="chartAsm"></div>
+          </div>
+        </div>
+
+        <div class="pa-footnote">
+          Sumber: Data Produksi Infor (WO PKAB/PKAS) + Data Produksi BaaN.
+          Nilai lengkap per proses tersedia di tabel <a href="resume.html">Resume Produksi</a>.
+        </div>
+
       </div>
     </div>
   </div>
 </div>
 
+<div class="pa-tooltip" id="paTooltip"></div>
+
 <script src="shared-components.js"></script>
 <script>
-function pageInit() {
+/* ── IndexedDB (read-only, sama dengan resume.html) ── */
+const PiDB = (() => {
+  const DB_NAME = 'bpms_produksi_infor';
+  const STORE   = 'periods';
+  function open() {
+    return new Promise((resolve, reject) => {
+      const req = indexedDB.open(DB_NAME, 1);
+      req.onupgradeneeded = e => e.target.result.createObjectStore(STORE);
+      req.onsuccess = e => resolve(e.target.result);
+      req.onerror   = e => reject(e.target.error);
+    });
+  }
+  async function getPeriods() {
+    const db = await open();
+    return new Promise((resolve, reject) => {
+      const req = db.transaction(STORE, 'readonly').objectStore(STORE).getAllKeys();
+      req.onsuccess = e => resolve(e.target.result || []);
+      req.onerror   = e => reject(e.target.error);
+    });
+  }
+  async function getData(period) {
+    const db = await open();
+    return new Promise((resolve, reject) => {
+      const req = db.transaction(STORE, 'readonly').objectStore(STORE).get(period);
+      req.onsuccess = e => resolve(e.target.result || []);
+      req.onerror   = e => reject(e.target.error);
+    });
+  }
+  async function setData(period, rows) {
+    const db = await open();
+    return new Promise((resolve, reject) => {
+      const req = db.transaction(STORE, 'readwrite').objectStore(STORE).put(rows, period);
+      req.onsuccess = () => resolve(true);
+      req.onerror   = () => reject(req.error);
+    });
+  }
+  return { getPeriods, getData, setData };
+})();
+
+const PiBaanDB = (() => {
+  const DB_NAME = 'bpms_produksi_baan';
+  const STORE   = 'periods';
+  function open() {
+    return new Promise((resolve, reject) => {
+      const req = indexedDB.open(DB_NAME, 1);
+      req.onupgradeneeded = e => e.target.result.createObjectStore(STORE);
+      req.onsuccess = e => resolve(e.target.result);
+      req.onerror   = e => reject(e.target.error);
+    });
+  }
+  async function getPeriods() {
+    const db = await open();
+    return new Promise((resolve, reject) => {
+      const req = db.transaction(STORE, 'readonly').objectStore(STORE).getAllKeys();
+      req.onsuccess = e => resolve(e.target.result || []);
+      req.onerror   = e => reject(e.target.error);
+    });
+  }
+  async function getData(period) {
+    const db = await open();
+    return new Promise((resolve, reject) => {
+      const req = db.transaction(STORE, 'readonly').objectStore(STORE).get(period);
+      req.onsuccess = e => resolve(e.target.result || []);
+      req.onerror   = e => reject(e.target.error);
+    });
+  }
+  async function setData(period, rows) {
+    const db = await open();
+    return new Promise((resolve, reject) => {
+      const req = db.transaction(STORE, 'readwrite').objectStore(STORE).put(rows, period);
+      req.onsuccess = () => resolve(true);
+      req.onerror   = () => reject(req.error);
+    });
+  }
+  return { getPeriods, getData, setData };
+})();
+
+const YEARS = [2013,2014,2015,2016,2017,2018,2019,2020,2021,2022,2023,2024,2025];
+
+/* ── Lookup & konversi (sama dengan resume.html) ── */
+function findColKeyPI(rowSample, ...patterns) {
+  const keys = Object.keys(rowSample);
+  for (const pat of patterns) {
+    const k = keys.find(k => k.trim().toLowerCase() === pat.toLowerCase());
+    if (k) return k;
+  }
+  for (const pat of patterns) {
+    const k = keys.find(k => k.trim().toLowerCase().includes(pat.toLowerCase()));
+    if (k) return k;
+  }
+  return null;
+}
+
+function buildLookupMapsPI() {
+  const state = BPMS.getState();
+
+  const plateMap = new Map();
+  const plateRows = state.dbPlateInfor || [];
+  if (plateRows.length) {
+    const s    = plateRows[0];
+    const vals = Object.keys(s);
+    const kKey = findColKeyPI(s, 'Item Data Infor', 'ItemDataInfor') || vals[1];
+    const kPnP = findColKeyPI(s, 'PN Plate Positif', 'PN Positif')   || vals[2];
+    const kQtP = findColKeyPI(s, 'Qty Plate Positif', 'Qty Positif') || vals[3];
+    const kPnN = findColKeyPI(s, 'PN Plate Negatif', 'PN Negatif')   || vals[4];
+    const kQtN = findColKeyPI(s, 'Qty Plate Negatif', 'Qty Negatif') || vals[5];
+    plateRows.forEach(row => {
+      const key = String(row[kKey] ?? '').trim();
+      if (!key) return;
+      plateMap.set(key, {
+        pnPos : String(row[kPnP] ?? ''),
+        qtyPos: Number(row[kQtP]) || 0,
+        pnNeg : String(row[kPnN] ?? ''),
+        qtyNeg: Number(row[kQtN]) || 0,
+      });
+    });
+  }
+
+  const typeMap = new Map();
+  const typeRows = state.dbTypePlate || [];
+  if (typeRows.length) {
+    const s     = typeRows[0];
+    const vals  = Object.keys(s);
+    const kCode = findColKeyPI(s, 'Type Plate', 'Code') || vals[2];
+    const kGrid = findColKeyPI(s, 'Grid Process', 'Grid') || vals[3];
+    typeRows.forEach(row => {
+      const key = String(row[kCode] ?? '').trim();
+      if (key) typeMap.set(key, String(row[kGrid] ?? ''));
+    });
+  }
+
+  const puLeMap = new Map();
+  const puLeRows = state.dbPuLe || [];
+  if (puLeRows.length) {
+    const s      = puLeRows[0];
+    const vals   = Object.keys(s);
+    const kPN    = findColKeyPI(s, 'PN Plate Infor', 'PN Plate', 'PN') || vals[2];
+    const kRatio = findColKeyPI(s, 'Qty Pule/Plate (kg)', 'Qty Pule/Plate', 'Qty Pule') || vals[4];
+    puLeRows.forEach(row => {
+      const key = String(row[kPN] ?? '').trim();
+      if (key) puLeMap.set(key, Number(row[kRatio]) || 0);
+    });
+  }
+
+  return { plateMap, typeMap, puLeMap };
+}
+
+function puleKeyPI(pn) {
+  return pn.charAt(2) === 'F' ? 'W-UNPL-' + pn.substring(7) : pn;
+}
+
+function gridProcessFromPN(pn) {
+  if (!pn) return '';
+  const parts = pn.split('-');
+  if (parts.length < 3) return '';
+  const c = parts[2].charAt(0);
+  if (c === 'W') return 'Grid Punching';
+  if (c === 'C' || c === 'D') return 'Grid Casting';
+  return 'Calcium Casting';
+}
+
+function computeGenPiRow(r, maps) {
+  const { plateMap, typeMap, puLeMap } = maps;
+  const item = r.item || '';
+  const qty  = r.qty  || 0;
+  const code = item.charAt(4);
+  let itemBattery = item;
+  if (item.charAt(0) === 'W') {
+    const c = item.split('');
+    c[0] = 'F'; c[4] = 'W';
+    itemBattery = c.join('');
+  }
+  const codeBattery = itemBattery.substring(2, 19);
+  const year        = r.trxDate ? String(r.trxDate).slice(-4) : '';
+  const wo          = String(r.orderNo || '').substring(0, 4);
+  const pv    = plateMap.get(codeBattery) || {};
+  const pnPos = pv.pnPos  || '';
+  const qpPos = (pv.qtyPos || 0) * qty;
+  const pnNeg = pv.pnNeg  || '';
+  const qpNeg = (pv.qtyNeg || 0) * qty;
+  const gridPos = typeMap.get(pnPos.substring(7, 11)) || gridProcessFromPN(pnPos);
+  const gridNeg = typeMap.get(pnNeg.substring(7, 11)) || gridProcessFromPN(pnNeg);
+  const qPulePos = Math.round((puLeMap.get(puleKeyPI(pnPos)) || 0) * qpPos);
+  const qPuleNeg = Math.round((puLeMap.get(puleKeyPI(pnNeg)) || 0) * qpNeg);
+  return { wo, code, year, qty, gridPos, qpPos, qPulePos, gridNeg, qpNeg, qPuleNeg };
+}
+
+/* ── Data loaders (server-first → IndexedDB fallback) ── */
+async function loadInforRows() {
+  let periods = [];
+  let serverAvailable = false;
+  try {
+    const r = await fetch('api/produksi-infor.php', { cache: 'no-store' });
+    if (r.ok) {
+      const j = await r.json();
+      if (j.ok && Array.isArray(j.periods)) { periods = j.periods; serverAvailable = true; }
+    }
+  } catch (_) {}
+  if (!periods.length) {
+    try { periods = await PiDB.getPeriods(); } catch (_) {}
+  }
+  if (!periods.length) return { rows: [], periods: 0 };
+
+  const results = await Promise.all(periods.map(async p => {
+    if (serverAvailable) {
+      try {
+        const r = await fetch('api/produksi-infor.php?period=' + p, { cache: 'no-store' });
+        if (r.ok) {
+          const j = await r.json();
+          if (j.ok && Array.isArray(j.data) && j.data.length) {
+            try { await PiDB.setData(p, j.data); } catch (_) {}
+            return j.data;
+          }
+        }
+      } catch (_) {}
+    }
+    try {
+      const cached = await PiDB.getData(p);
+      if (cached && cached.length) return cached;
+    } catch (_) {}
+    return [];
+  }));
+  return { rows: results.flat(), periods: periods.length };
+}
+
+async function loadBaanRows() {
+  let periods = [];
+  let serverAvailable = false;
+  try {
+    const r = await fetch('api/produksi-baan.php', { cache: 'no-store' });
+    if (r.ok) {
+      const j = await r.json();
+      if (j.ok && Array.isArray(j.periods)) { periods = j.periods; serverAvailable = true; }
+    }
+  } catch (_) {}
+  if (!periods.length) {
+    try { periods = await PiBaanDB.getPeriods(); } catch (_) {}
+  }
+  if (!periods.length) return [];
+
+  const results = await Promise.all(periods.map(async p => {
+    if (serverAvailable) {
+      try {
+        const r = await fetch('api/produksi-baan.php?period=' + p, { cache: 'no-store' });
+        if (r.ok) {
+          const j = await r.json();
+          if (j.ok && Array.isArray(j.data) && j.data.length) {
+            try { await PiBaanDB.setData(p, j.data); } catch (_) {}
+            return j.data;
+          }
+        }
+      } catch (_) {}
+    }
+    try {
+      const cached = await PiBaanDB.getData(p);
+      if (cached && cached.length) return cached;
+    } catch (_) {}
+    return [];
+  }));
+  return results.flat();
+}
+
+/* ── Agregasi per tahun (logika identik dengan resume.html) ── */
+function computeYearData(inforRows, baanRows, maps) {
+  const acc = {};
+  const get = y => (acc[y] = acc[y] || { asm:0, gc:0, gp:0, bm:0, fm:0, has:false });
+
+  for (const r of inforRows) {
+    const g = computeGenPiRow(r, maps);
+    if (g.wo !== 'PKAB' && g.wo !== 'PKAS') continue;
+    if (!/^\d{4}$/.test(g.year)) continue;
+    const a = get(g.year);
+    a.has  = true;
+    a.asm += Number(r.qty) || 0;
+    if (g.gridPos === 'Grid Casting')  a.gc += g.qpPos;
+    if (g.gridNeg === 'Grid Casting')  a.gc += g.qpNeg;
+    if (g.gridPos === 'Grid Punching') a.gp += g.qpPos;
+    if (g.gridNeg === 'Grid Punching') a.gp += g.qpNeg;
+    a.bm += (g.qPulePos || 0) + (g.qPuleNeg || 0);
+    if (g.code === 'D') a.fm += g.qpPos + g.qpNeg;
+  }
+
+  // BaaN: field langsung, tanpa filter WO
+  for (const r of baanRows) {
+    const y = String(r.year || '');
+    if (!/^\d{4}$/.test(y)) continue;
+    const a = get(y);
+    a.has  = true;
+    a.asm += Number(r.qtyProduksi) || 0;
+    if (r.gridPos === 'Grid Casting')  a.gc += Number(r.qpPos) || 0;
+    if (r.gridNeg === 'Grid Casting')  a.gc += Number(r.qpNeg) || 0;
+    if (r.gridPos === 'Grid Punching') a.gp += Number(r.qpPos) || 0;
+    if (r.gridNeg === 'Grid Punching') a.gp += Number(r.qpNeg) || 0;
+    a.bm += (Number(r.qPulePos) || 0) + (Number(r.qPuleNeg) || 0);
+    if (r.code === 'D') a.fm += (Number(r.qpPos) || 0) + (Number(r.qpNeg) || 0);
+  }
+
+  // Parameter turunan
+  for (const y of Object.keys(acc)) {
+    const a = acc[y];
+    const plates = a.gc + a.gp;
+    a.plateBattery     = a.asm   ? plates / a.asm : null;
+    a.beratLeadBattery = a.asm && a.bm ? a.bm / a.asm : null;
+    a.beratLeadPanel   = plates && a.bm ? a.bm / plates : null;
+  }
+  return acc;
+}
+
+/* ── Format helpers ── */
+function fmtID(n, dec = 0) {
+  return Number(n).toLocaleString('id-ID', { minimumFractionDigits: dec, maximumFractionDigits: dec });
+}
+function fmtCompact(n) {
+  if (n >= 1e6) return fmtID(n / 1e6, 1) + ' jt';
+  if (n >= 1e3) return fmtID(n / 1e3, 0) + ' rb';
+  return fmtID(n);
+}
+function niceStep(rough, maxDec = Infinity) {
+  const pow = Math.pow(10, Math.floor(Math.log10(rough)));
+  let mults = [1, 2, 2.5, 5, 10];
+  // Buang step 2,5× jika desimalnya melebihi batas (mis. 0,0025 butuh 4 digit)
+  if (decimalsForStep(2.5 * pow) > maxDec) mults = [1, 2, 5, 10];
+  return mults.map(m => m * pow).find(s => s >= rough) || rough;
+}
+// Ticks dari 0 sampai ≥ max (baseline nol — untuk bar/column chart)
+function niceTicks(max, count = 4) {
+  if (max <= 0) return [0];
+  const step = niceStep(max / count);
+  const hi   = Math.ceil(max / step - 1e-9) * step;
+  const ticks = [];
+  for (let v = 0; v <= hi + step * 0.001; v += step) ticks.push(v);
+  return ticks;
+}
+// Domain min–max data (tanpa paksa nol — untuk line chart parameter)
+// Step dibatasi maksimal 3 desimal agar label sumbu Y tetap ringkas
+function niceDomain(min, max, count = 3) {
+  if (min === max) {
+    const pad = Math.abs(min) * 0.05 || 1;
+    min -= pad; max += pad;
+  }
+  const step = niceStep((max - min) / count, 3);
+  const lo   = Math.floor(min / step + 1e-9) * step;
+  const hi   = Math.ceil(max / step - 1e-9) * step;
+  const ticks = [];
+  for (let v = lo; v <= hi + step * 0.001; v += step) ticks.push(v);
+  return { lo, hi, step, ticks };
+}
+// Jumlah desimal yang dibutuhkan agar label tick step kecil tetap terbaca
+function decimalsForStep(step) {
+  for (let d = 0; d <= 4; d++) {
+    const scaled = step * Math.pow(10, d);
+    if (Math.abs(scaled - Math.round(scaled)) < 1e-9) return d;
+  }
+  return 4;
+}
+
+/* ── Tooltip ── */
+const tooltipEl = () => document.getElementById('paTooltip');
+
+function showTooltip(evt, title, rows) {
+  const tt = tooltipEl();
+  tt.innerHTML = '';
+  const t = document.createElement('div');
+  t.className = 'tt-title';
+  t.textContent = title;
+  tt.appendChild(t);
+  for (const r of rows) {
+    const row = document.createElement('div');
+    row.className = 'tt-row';
+    if (r.color) {
+      const key = document.createElement('span');
+      key.className = 'tt-key';
+      key.style.borderTopColor = r.color;
+      row.appendChild(key);
+    }
+    const val = document.createElement('span');
+    val.className = 'tt-val';
+    val.textContent = r.value;
+    row.appendChild(val);
+    const lbl = document.createElement('span');
+    lbl.className = 'tt-lbl';
+    lbl.textContent = r.label;
+    row.appendChild(lbl);
+    tt.appendChild(row);
+  }
+  tt.style.display = 'block';
+  moveTooltip(evt);
+}
+function moveTooltip(evt) {
+  const tt = tooltipEl();
+  const pad = 14;
+  let x = evt.clientX + pad;
+  let y = evt.clientY + pad;
+  const r = tt.getBoundingClientRect();
+  if (x + r.width  > window.innerWidth  - 8) x = evt.clientX - r.width  - pad;
+  if (y + r.height > window.innerHeight - 8) y = evt.clientY - r.height - pad;
+  tt.style.left = x + 'px';
+  tt.style.top  = y + 'px';
+}
+function hideTooltip() { tooltipEl().style.display = 'none'; }
+
+const SVGNS = 'http://www.w3.org/2000/svg';
+function svgEl(tag, attrs) {
+  const el = document.createElementNS(SVGNS, tag);
+  for (const k in attrs) el.setAttribute(k, attrs[k]);
+  return el;
+}
+
+/* ── Line chart (single series, crosshair + tooltip) ── */
+function renderLineChart(containerId, points, opts) {
+  // points: [{year, value}] — value boleh null (tahun tanpa data dilewati)
+  const container = document.getElementById(containerId);
+  container.innerHTML = '';
+  const valid = points.filter(p => p.value != null);
+  if (!valid.length) {
+    container.innerHTML = '<div class="pa-footnote" style="padding:24px 0;text-align:center">Belum ada data</div>';
+    return;
+  }
+
+  const W = 360, H = 190, mL = 46, mR = 14, mT = 12, mB = 24;
+  const iW = W - mL - mR, iH = H - mT - mB;
+  const n  = points.length;
+  const band = iW / n;
+  const xAt  = i => mL + band * i + band / 2;
+
+  // Domain mengikuti rentang data (bukan dari nol) agar variasi garis terlihat
+  const vals = valid.map(p => p.value);
+  const dom  = niceDomain(Math.min(...vals), Math.max(...vals));
+  const { lo, hi, ticks } = dom;
+  const dec  = decimalsForStep(dom.step);
+  const yAt  = v => mT + iH - ((v - lo) / (hi - lo || 1)) * iH;
+
+  const svg = svgEl('svg', { viewBox: `0 0 ${W} ${H}`, class: 'chart-svg' });
+
+  // Gridlines + y ticks
+  for (const tv of ticks) {
+    svg.appendChild(svgEl('line', { x1: mL, y1: yAt(tv), x2: W - mR, y2: yAt(tv), stroke: 'var(--gridline)', 'stroke-width': 1 }));
+    const t = svgEl('text', { x: mL - 6, y: yAt(tv) + 3.5, 'text-anchor': 'end', class: 'ax' });
+    t.textContent = fmtID(tv, dec);
+    svg.appendChild(t);
+  }
+  // Baseline
+  svg.appendChild(svgEl('line', { x1: mL, y1: mT + iH, x2: W - mR, y2: mT + iH, stroke: 'var(--baseline)', 'stroke-width': 1 }));
+
+  // X labels (setiap 2 tahun agar tidak tabrakan)
+  points.forEach((p, i) => {
+    if (i % 2 !== 0) return;
+    const t = svgEl('text', { x: xAt(i), y: H - 6, 'text-anchor': 'middle', class: 'ax' });
+    t.textContent = p.year;
+    svg.appendChild(t);
+  });
+
+  // Line path per segmen data (domain terpotong — tanpa area wash agar tidak menyesatkan)
+  const segs = [];
+  let cur = [];
+  points.forEach((p, i) => {
+    if (p.value != null) cur.push({ i, v: p.value });
+    else { if (cur.length) segs.push(cur); cur = []; }
+  });
+  if (cur.length) segs.push(cur);
+
+  for (const seg of segs) {
+    if (seg.length > 1) {
+      const lineD = seg.map((s, j) => `${j ? 'L' : 'M'}${xAt(s.i)},${yAt(s.v)}`).join(' ');
+      svg.appendChild(svgEl('path', { d: lineD, fill: 'none', stroke: 'var(--series-1)', 'stroke-width': 2, 'stroke-linejoin': 'round', 'stroke-linecap': 'round' }));
+    }
+    // End dot (2px surface ring)
+    const last = seg[seg.length - 1];
+    svg.appendChild(svgEl('circle', { cx: xAt(last.i), cy: yAt(last.v), r: 4.5, fill: 'var(--series-1)', stroke: '#ffffff', 'stroke-width': 2 }));
+  }
+
+  // Direct label: hanya endpoint terakhir
+  const lastPt = valid[valid.length - 1];
+  const lastIdx = points.indexOf(lastPt);
+  const dl = svgEl('text', {
+    x: Math.min(xAt(lastIdx), W - mR - 2),
+    y: Math.max(yAt(lastPt.value) - 9, 10),
+    'text-anchor': 'end',
+    class: 'dl',
+  });
+  dl.textContent = opts.valFmt(lastPt.value);
+  svg.appendChild(dl);
+
+  // Crosshair
+  const cross = svgEl('line', { x1: 0, y1: mT, x2: 0, y2: mT + iH, stroke: 'var(--baseline)', 'stroke-width': 1, visibility: 'hidden' });
+  svg.appendChild(cross);
+
+  // Hit bands per tahun
+  points.forEach((p, i) => {
+    const hit = svgEl('rect', { x: mL + band * i, y: 0, width: band, height: H, fill: 'transparent' });
+    hit.addEventListener('pointermove', evt => {
+      cross.setAttribute('x1', xAt(i));
+      cross.setAttribute('x2', xAt(i));
+      cross.setAttribute('visibility', 'visible');
+      showTooltip(evt, String(p.year), [{
+        color: getComputedStyle(document.querySelector('.pa-root')).getPropertyValue('--series-1').trim(),
+        value: p.value != null ? opts.valFmt(p.value) : '—',
+        label: opts.seriesLabel,
+      }]);
+    });
+    hit.addEventListener('pointerleave', () => { cross.setAttribute('visibility', 'hidden'); hideTooltip(); });
+    svg.appendChild(hit);
+  });
+
+  container.appendChild(svg);
+}
+
+/* ── Column chart (stacked ≤2 seri / single, per-mark tooltip) ── */
+function renderColumnChart(containerId, points, series, opts) {
+  // points: [{year, values:[v1, v2?]}]; series: [{label, cssVar}]
+  const container = document.getElementById(containerId);
+  container.innerHTML = '';
+  const valid = points.filter(p => p.values.some(v => v));
+  if (!valid.length) {
+    container.innerHTML = '<div class="pa-footnote" style="padding:24px 0;text-align:center">Belum ada data</div>';
+    return;
+  }
+
+  const W = 620, H = 250, mL = 48, mR = 14, mT = 18, mB = 24;
+  const iW = W - mL - mR, iH = H - mT - mB;
+  const n  = points.length;
+  const band = iW / n;
+  const barW = Math.min(24, band - 12);
+  const GAP  = 2; // surface gap antar segmen stack
+
+  const totals = points.map(p => p.values.reduce((s, v) => s + (v || 0), 0));
+  const maxV   = Math.max(...totals);
+  const ticks  = niceTicks(maxV, 5);
+  const top    = ticks[ticks.length - 1] || 1;
+  const hOf    = v => (v / top) * iH;
+
+  const svg = svgEl('svg', { viewBox: `0 0 ${W} ${H}`, class: 'chart-svg' });
+
+  for (const tv of ticks) {
+    const y = mT + iH - hOf(tv);
+    svg.appendChild(svgEl('line', { x1: mL, y1: y, x2: W - mR, y2: y, stroke: 'var(--gridline)', 'stroke-width': 1 }));
+    const t = svgEl('text', { x: mL - 6, y: y + 3.5, 'text-anchor': 'end', class: 'ax' });
+    t.textContent = fmtCompact(tv);
+    svg.appendChild(t);
+  }
+  svg.appendChild(svgEl('line', { x1: mL, y1: mT + iH, x2: W - mR, y2: mT + iH, stroke: 'var(--baseline)', 'stroke-width': 1 }));
+
+  const rootStyle = getComputedStyle(document.querySelector('.pa-root'));
+  const colors = series.map(s => rootStyle.getPropertyValue(s.cssVar).trim());
+
+  const maxIdx  = totals.indexOf(Math.max(...totals));
+  let lastIdx = -1;
+  points.forEach((p, i) => { if (p.values.some(v => v)) lastIdx = i; });
+
+  points.forEach((p, i) => {
+    const cx    = mL + band * i + band / 2;
+    const x     = cx - barW / 2;
+    const total = totals[i];
+
+    // X label — setiap tahun (band cukup lebar di chart ini)
+    const t = svgEl('text', { x: cx, y: H - 6, 'text-anchor': 'middle', class: 'ax' });
+    t.textContent = p.year;
+    svg.appendChild(t);
+    if (!total) return;
+
+    // Segmen dari baseline ke atas; segmen di atasnya dipisah GAP 2px (surface gap),
+    // ujung data (segmen teratas) rounded 4px, dasar tetap siku di baseline
+    let yCursor = mT + iH;
+    let drawnCount = 0;
+    p.values.forEach((v, si) => {
+      if (!v) return;
+      const segTop  = yCursor - hOf(v);
+      const isFirst = drawnCount === 0;
+      const h = Math.max(hOf(v) - (isFirst ? 0 : GAP), 1);
+      const yTop = segTop;
+      const isTopSeg = si === p.values.length - 1 || !p.values.slice(si + 1).some(x2 => x2);
+      const r = isTopSeg ? Math.min(4, h / 2) : 0;
+      // Rounded hanya di ujung atas: pakai path
+      const seg = r
+        ? svgEl('path', { d:
+            `M${x},${yTop + h} L${x},${yTop + r} Q${x},${yTop} ${x + r},${yTop} L${x + barW - r},${yTop} Q${x + barW},${yTop} ${x + barW},${yTop + r} L${x + barW},${yTop + h} Z`,
+            fill: colors[si] })
+        : svgEl('rect', { x, y: yTop, width: barW, height: h, fill: colors[si] });
+      svg.appendChild(seg);
+      yCursor = segTop;
+      drawnCount++;
+    });
+
+    // Label selektif: hanya tahun maksimum dan tahun terakhir
+    if (i === maxIdx || i === lastIdx) {
+      const dl = svgEl('text', { x: cx, y: mT + iH - hOf(total) - 5, 'text-anchor': 'middle', class: 'dl' });
+      dl.textContent = fmtCompact(total);
+      svg.appendChild(dl);
+    }
+  });
+
+  // Hit bands + tooltip (semua seri pada X yang sama)
+  points.forEach((p, i) => {
+    const hit = svgEl('rect', { x: mL + band * i, y: 0, width: band, height: H, fill: 'transparent' });
+    hit.addEventListener('pointermove', evt => {
+      const rows = series.map((s, si) => ({
+        color: colors[si],
+        value: p.values[si] ? fmtID(Math.round(p.values[si])) : '0',
+        label: s.label,
+      }));
+      if (series.length > 1) {
+        rows.push({ color: null, value: fmtID(Math.round(totals[i])), label: 'Total' });
+      }
+      showTooltip(evt, String(p.year), rows);
+    });
+    hit.addEventListener('pointerleave', hideTooltip);
+    svg.appendChild(hit);
+  });
+
+  container.appendChild(svg);
+}
+
+/* ── KPI tiles ── */
+function renderKpi(valueId, deltaId, sparkId, seriesPoints, opts) {
+  const valid = seriesPoints.filter(p => p.value != null);
+  if (!valid.length) return;
+  const last = valid[valid.length - 1];
+  const prev = valid.length > 1 ? valid[valid.length - 2] : null;
+
+  document.getElementById(valueId).textContent = opts.valFmt(last.value);
+
+  const deltaEl = document.getElementById(deltaId);
+  if (prev && prev.value) {
+    const pct  = ((last.value - prev.value) / prev.value) * 100;
+    const sign = pct >= 0 ? '▲' : '▼';
+    deltaEl.textContent = `${sign} ${fmtID(Math.abs(pct), 1)}% vs ${prev.year} · ${last.year}`;
+    if (opts.valenced) deltaEl.classList.add(pct >= 0 ? 'up' : 'down');
+  } else {
+    deltaEl.textContent = `Tahun ${last.year}`;
+  }
+
+  // Sparkline: garis de-emphasis, titik akhir aksen
+  const svg = document.getElementById(sparkId);
+  svg.innerHTML = '';
+  const W = 160, H = 28, pad = 4;
+  const vals = valid.map(p => p.value);
+  const min = Math.min(...vals), max = Math.max(...vals);
+  const range = max - min || 1;
+  const xAt = i => pad + (W - pad * 2) * (valid.length === 1 ? 0.5 : i / (valid.length - 1));
+  const yAt = v => H - pad - ((v - min) / range) * (H - pad * 2);
+  if (valid.length > 1) {
+    const d = valid.map((p, i) => `${i ? 'L' : 'M'}${xAt(i)},${yAt(p.value)}`).join(' ');
+    svg.appendChild(svgEl('path', { d, fill: 'none', stroke: 'var(--spark)', 'stroke-width': 1.5, 'stroke-linejoin': 'round' }));
+  }
+  svg.appendChild(svgEl('circle', {
+    cx: xAt(valid.length - 1), cy: yAt(last.value), r: 3,
+    fill: 'var(--series-1)', stroke: '#ffffff', 'stroke-width': 1.5,
+  }));
+}
+
+/* ── Main render ── */
+async function loadDashboard() {
+  const status = document.getElementById('loadStatus');
+  status.textContent = 'Memuat data…';
+  try {
+    const [infor, baanRows] = await Promise.all([loadInforRows(), loadBaanRows()]);
+    if (!infor.rows.length && !baanRows.length) {
+      status.textContent = 'Belum ada data Produksi Infor maupun BaaN.';
+      return;
+    }
+
+    const maps = buildLookupMapsPI();
+    const acc  = computeYearData(infor.rows, baanRows, maps);
+
+    const pts = key => YEARS.map(y => {
+      const a = acc[String(y)];
+      return { year: y, value: a && a.has && a[key] != null && a[key] !== 0 ? a[key] : null };
+    });
+
+    const plateSeries     = pts('plateBattery');
+    const leadBatSeries   = pts('beratLeadBattery');
+    const leadPanelSeries = pts('beratLeadPanel');
+    const asmSeries       = pts('asm');
+
+    // KPI tiles
+    renderKpi('kpiPlate',     'kpiPlateDelta',     'sparkPlate',     plateSeries,     { valFmt: v => fmtID(v, 1) });
+    renderKpi('kpiLeadBat',   'kpiLeadBatDelta',   'sparkLeadBat',   leadBatSeries,   { valFmt: v => fmtID(v, 1) });
+    renderKpi('kpiLeadPanel', 'kpiLeadPanelDelta', 'sparkLeadPanel', leadPanelSeries, { valFmt: v => fmtID(v, 3) });
+    renderKpi('kpiAsm',       'kpiAsmDelta',       'sparkAsm',       asmSeries,       { valFmt: v => fmtCompact(Math.round(v)), valenced: true });
+
+    // Parameter trends (small multiples, single series)
+    renderLineChart('chartPlate',     plateSeries,     { seriesLabel: 'Plate/battery',      valFmt: v => fmtID(v, 1) });
+    renderLineChart('chartLeadBat',   leadBatSeries,   { seriesLabel: 'Berat lead/battery', valFmt: v => fmtID(v, 1) });
+    renderLineChart('chartLeadPanel', leadPanelSeries, { seriesLabel: 'Berat lead/panel',   valFmt: v => fmtID(v, 3) });
+
+    // Volume plate: stacked Grid Casting + Grid Punching
+    const volPoints = YEARS.map(y => {
+      const a = acc[String(y)];
+      return { year: y, values: [a ? a.gc : 0, a ? a.gp : 0] };
+    });
+    renderColumnChart('chartVolume', volPoints, [
+      { label: 'Grid Casting',  cssVar: '--series-1' },
+      { label: 'Grid Punching', cssVar: '--series-2' },
+    ]);
+
+    // Assembling: single series column
+    const asmPoints = YEARS.map(y => {
+      const a = acc[String(y)];
+      return { year: y, values: [a ? a.asm : 0] };
+    });
+    renderColumnChart('chartAsm', asmPoints, [
+      { label: 'Assembling', cssVar: '--series-1' },
+    ]);
+
+    status.textContent =
+      `Infor: ${infor.rows.length.toLocaleString('id-ID')} record (${infor.periods} periode) · BaaN: ${baanRows.length.toLocaleString('id-ID')} record`;
+  } catch (err) {
+    status.textContent = `Gagal memuat data: ${err.message}`;
+  }
+}
+
+/* ── Init ── */
+async function pageInit() {
   document.getElementById('topbarMount').innerHTML = BPMS.renderTopbar('Dashboard — Parameter Asumsi');
+  document.getElementById('reloadBtn').addEventListener('click', async () => {
+    const btn = document.getElementById('reloadBtn');
+    btn.disabled = true;
+    await loadDashboard();
+    btn.disabled = false;
+  });
+  await loadDashboard();
 }
 </script>
 </body>

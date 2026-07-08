@@ -1,7 +1,7 @@
 # Factory Analytics Hub (FAH) — Current State & Activity Log
 
 **Project:** Factory Analytics Hub (FAH) v1.0  
-**Last Updated:** 2026-07-07  
+**Last Updated:** 2026-07-08  
 **Stack:** HTML5 + Vanilla JS + PHP (state.php) + SheetJS
 
 ---
@@ -19,7 +19,7 @@
 | Setting Kapasitas | `setting-capacity.html` | ✅ Selesai |
 | Man Power | `man-power.html` | ✅ Selesai (redesign) |
 | Database Konversi | `database-konversi.html` | 🔲 Placeholder |
-| PA — Dashboard | `pa-dashboard.html` | 🔲 Stub (Parameter Asumsi) |
+| PA — Dashboard | `pa-dashboard.html` | ✅ Selesai (v1 — KPI + tren parameter + volume produksi) |
 | PA — Resume | `resume.html` | 🔶 Tabel struktur selesai (data kosong) |
 | PA — Data Produksi Infor | `data-produksi-infor.html` | ✅ Selesai (upload Excel, tab Data + Summary, filter, export) |
 | PA — Data Produksi BaaN | `data-produksi-baan.html` | ✅ Selesai (redesign v2 — upload langsung 20-kol Generated format) |
@@ -33,6 +33,11 @@
 ---
 
 ## Activity Log
+
+### 2026-07-08
+- **pa-dashboard.html** — Dashboard Parameter Asumsi v1 dibangun (menggantikan stub). Sumber data & logika agregasi identik dengan `resume.html` (Infor via computeGenPiRow + filter WO PKAB/PKAS, BaaN field langsung tanpa filter WO, server-first → IndexedDB fallback). Isi: (1) 4 KPI card — Plate/Battery, Berat Lead/Battery, Berat Lead/Panel, Assembling — nilai tahun terakhir + delta % vs tahun sebelumnya + sparkline; (2) 3 line chart small-multiples tren parameter per tahun (crosshair + tooltip); (3) stacked bar Volume Plate per Tahun (Grid Casting vs Grid Punching, legend + tooltip + label total di tahun max & terakhir); (4) column chart Assembling per Tahun. Chart inline SVG vanilla JS (tanpa library), palet biru #2a78d6 / aqua #1baf7a. Tombol Muat Ulang + status record count + link ke tabel Resume.
+- **data-produksi-baan.html** — Fix: hapus pemanggilan `DOMContentLoaded → pageInit` manual; `shared-components.js` sudah memanggil `pageInit()` otomatis setelah sync server, sehingga sebelumnya event listener terpasang dobel (upload/commit bisa terpicu 2×).
+- **pa-dashboard.html** — Fix skala chart: (1) `niceTicks` kini menjamin tick teratas ≥ nilai maksimum (sebelumnya garis/bar menembus gridline teratas, mis. 4,8 terpotong di tick 4); (2) line chart parameter pakai `niceDomain` min–max data (bukan baseline nol) sehingga variasi garis terlihat, jumlah desimal tick otomatis dari step; (3) area wash dihapus (menyesatkan pada domain terpotong); (4) column chart pakai 5 tick agar step lebih halus; (5) step sumbu Y line chart dibatasi maks 3 desimal (step 2,5× dibuang bila butuh 4 digit, mis. 0,0025 → 0,005) + margin kiri 40→46px agar label tidak terpotong.
 
 ### 2026-07-07
 - **data-produksi-baan.html** — Redesign penuh (v2). Tab "Data Produksi" dihapus. Upload sekarang langsung membaca format **Generated Data 20 kolom** (Date, Year, WO, Code, Category, Item Battery, Item Assy, Qty Produksi, Code Battery, Battery Type, Plate Positif, Form Status (+), Grid Process (+), Qty Plate (+), Pule (+), Plate Negatif, Form Status (-), Grid Process (-), Qty Plate (-), Pule (-)). Tidak ada komputasi dari raw data — data disimpan dan ditampilkan as-is. Deteksi periode dari kolom Date (Excel serial → DD/MM/YYYY via SheetJS cellDates:true). Stat cards: Total Record, Total Qty Produksi, Unique Code Battery, Total Qty Plate. Preview 200 baris sebelum simpan. Export langsung kolom stored data. Semua logika komputasi (computeGenPiRow, buildLookupMapsPI, puleKeyPI, dll) dihapus. Storage pattern identik dengan Infor: memory cache → IndexedDB → server. Tombol "Hapus Periode" / "Hapus Semua Periode" toggle sesuai pilihan periode (updateDeleteButtons). deleteAllPeriods() ditambahkan.
