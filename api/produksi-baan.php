@@ -45,16 +45,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         exit;
     }
 
-    // List all periods
+    // List all periods (+ version: mtime terbaru & jumlah file, untuk deteksi perubahan data)
     $files   = glob($dataDir . '/*.json');
     $periods = [];
+    $maxMtime = 0;
     if ($files) {
         foreach ($files as $f) {
             $periods[] = basename($f, '.json');
+            $mt = @filemtime($f);
+            if ($mt && $mt > $maxMtime) $maxMtime = $mt;
         }
         rsort($periods);
     }
-    echo json_encode(['ok' => true, 'periods' => $periods]);
+    echo json_encode(['ok' => true, 'periods' => $periods, 'version' => $maxMtime . '-' . count($periods)]);
     exit;
 }
 

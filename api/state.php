@@ -31,6 +31,12 @@ function normalizeState($state) {
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {
+    // GET ?version=1 → hanya versi file state (murah, untuk cek perubahan Database Konversi dkk.)
+    if (isset($_GET['version'])) {
+        $mt = file_exists($dataFile) ? @filemtime($dataFile) : 0;
+        echo json_encode(['ok' => true, 'version' => (string)$mt]);
+        exit;
+    }
     if (!file_exists($dataFile)) {
         $default = [
             'dbLine' => ['Line 1','Line 2','Line 3','Line 4','Line 5','Line 6','Line 7'],
