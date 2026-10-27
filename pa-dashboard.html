@@ -8,8 +8,9 @@
   <style>
     /* Chart chrome — palet dataviz (light) */
     .pa-root {
-      --series-1:   #2a78d6;  /* biru  — Grid Casting / seri utama */
-      --series-2:   #1baf7a;  /* aqua  — Grid Punching */
+      --series-1:   #2a78d6;  /* biru  — Grid Casting / DRY / seri utama */
+      --series-2:   #1baf7a;  /* aqua  — Grid Punching / WET */
+      --series-3:   #eda100;  /* amber — DUC */
       --ink-muted:  #6c717d;
       --gridline:   #e9eaef;
       --baseline:   #c9ccd6;
@@ -33,17 +34,22 @@
     .kpi-spark { margin-top: 8px; display: block; }
 
     /* Chart cards */
+    /* min(Npx, 100%) menjaga grid tidak overflow di layar sempit (kolom turun jadi 1) */
     .pa-grid-3 {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr));
       gap: 12px;
       margin-bottom: 16px;
     }
     .pa-grid-2 {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(min(380px, 100%), 1fr));
       gap: 12px;
       margin-bottom: 16px;
+    }
+    @media (max-width: 640px) {
+      .pa-toolbar { flex-wrap: wrap; }
+      .pa-toolbar .pa-status { margin-left: 0; width: 100%; order: 2; }
     }
     .chart-card { position: relative; }
     .chart-sub  { font-size: 11px; color: var(--text-4); margin: -12px 0 10px; }
@@ -58,6 +64,19 @@
     }
     .chart-legend .lg-item { display: flex; align-items: center; gap: 6px; }
     .chart-legend .lg-swatch { width: 10px; height: 10px; border-radius: 2px; }
+
+    /* Caption insight dinamis di bawah chart (judul card tetap statis) */
+    .chart-insight {
+      margin-top: 10px;
+      padding: 6px 10px;
+      font-size: 12px;
+      line-height: 1.45;
+      color: var(--text-2);
+      background: rgba(94,106,210,.06);
+      border-left: 3px solid var(--accent);
+      border-radius: 0 4px 4px 0;
+    }
+    .chart-insight b { color: var(--text-1); }
 
     /* Tooltip */
     .pa-tooltip {
@@ -85,6 +104,32 @@
 
     text.ax { font-family: 'Inter', system-ui, sans-serif; font-size: 10.5px; fill: var(--ink-muted); font-variant-numeric: tabular-nums; }
     text.dl { font-family: 'Inter', system-ui, sans-serif; font-size: 10.5px; fill: var(--text-2); font-weight: 600; }
+
+    /* Tabs (pola sama dengan data-produksi-infor.html) */
+    .pi-tabs {
+      display: flex;
+      gap: 2px;
+      border-bottom: 2px solid var(--border-solid2);
+      margin-bottom: 20px;
+    }
+    .pi-tab {
+      padding: 8px 18px;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-3);
+      cursor: pointer;
+      border: none;
+      background: none;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -2px;
+      border-radius: 6px 6px 0 0;
+      transition: color var(--transition), background var(--transition), border-color var(--transition);
+      white-space: nowrap;
+    }
+    .pi-tab:hover  { color: var(--text-1); background: var(--bg-2); }
+    .pi-tab.active { color: var(--accent); border-bottom-color: var(--accent); background: rgba(94,106,210,.06); }
+    .pi-panel { display: none; }
+    .pi-panel.active { display: block; }
   </style>
 </head>
 <body>
@@ -96,6 +141,16 @@
 
     <div class="page-body">
       <div class="pa-root">
+
+        <nav class="pi-tabs" id="paTabs">
+          <button class="pi-tab active" data-tab="parameter">Overview</button>
+          <button class="pi-tab"        data-tab="order">Summary Order</button>
+          <button class="pi-tab"        data-tab="loading">Loading per Proses</button>
+          <button class="pi-tab"        data-tab="capacity">Capacity Dashboard</button>
+        </nav>
+
+        <!-- Tab: Parameter Asumsi -->
+        <div id="panel-parameter" class="pi-panel active">
 
         <div class="pa-toolbar">
           <span class="pa-status" id="loadStatus"></span>
@@ -141,16 +196,19 @@
             <div class="card-header"><span class="card-title">Plate/Battery per Tahun</span></div>
             <div class="chart-sub">panel per battery</div>
             <div id="chartPlate"></div>
+            <div class="chart-insight" id="plateInsight" style="display:none"></div>
           </div>
           <div class="card chart-card">
             <div class="card-header"><span class="card-title">Berat Lead/Battery per Tahun</span></div>
             <div class="chart-sub">kg per battery</div>
             <div id="chartLeadBat"></div>
+            <div class="chart-insight" id="leadBatInsight" style="display:none"></div>
           </div>
           <div class="card chart-card">
             <div class="card-header"><span class="card-title">Berat Lead/Panel per Tahun</span></div>
             <div class="chart-sub">kg per panel</div>
             <div id="chartLeadPanel"></div>
+            <div class="chart-insight" id="leadPanelInsight" style="display:none"></div>
           </div>
         </div>
 
@@ -164,17 +222,92 @@
               <span class="lg-item"><span class="lg-swatch" style="background:var(--series-2)"></span>Grid Punching</span>
             </div>
             <div id="chartVolume"></div>
+            <div class="chart-insight" id="volInsight" style="display:none"></div>
           </div>
           <div class="card chart-card">
             <div class="card-header"><span class="card-title">Assembling per Tahun</span></div>
             <div class="chart-sub">pcs battery (WO PKAB/PKAS + BaaN)</div>
             <div id="chartAsm"></div>
+            <div class="chart-insight" id="asmInsight" style="display:none"></div>
           </div>
+        </div>
+
+        <!-- Category trend (kiri) + slot kosong (kanan) -->
+        <div class="pa-grid-2">
+          <div class="card chart-card">
+            <div class="card-header"><span class="card-title" id="catTitle">Trend produksi per category</span></div>
+            <div class="chart-sub">Qty Produksi per tahun berdasarkan category (WO PKAB/PKAS + BaaN)</div>
+            <div class="chart-legend">
+              <span class="lg-item"><span class="lg-swatch" style="background:var(--series-1)"></span>DRY</span>
+              <span class="lg-item"><span class="lg-swatch" style="background:var(--series-2)"></span>WET</span>
+              <span class="lg-item"><span class="lg-swatch" style="background:var(--series-3)"></span>DUC</span>
+            </div>
+            <div id="chartCategory"></div>
+            <div class="chart-insight" id="catInsight" style="display:none"></div>
+          </div>
+          <div aria-hidden="true"></div><!-- slot kanan sengaja kosong -->
         </div>
 
         <div class="pa-footnote">
           Sumber: Data Produksi Infor (WO PKAB/PKAS) + Data Produksi BaaN.
           Nilai lengkap per proses tersedia di tabel <a href="resume.html">Resume Produksi</a>.
+        </div>
+
+        </div><!-- /panel-parameter -->
+
+        <!-- Tab: Summary Order -->
+        <div id="panel-order" class="pi-panel">
+          <div class="pa-toolbar">
+            <label for="orderYearFilter" style="font-size:12px;color:var(--text-3)">Tahun:</label>
+            <select id="orderYearFilter" class="form-control" style="width:auto">
+              <option value="">Semua Tahun</option>
+            </select>
+            <span class="pa-status" id="orderStatus"></span>
+            <button class="btn btn-ghost btn-sm" id="orderReloadBtn">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.5"/>
+              </svg>
+              Muat Ulang
+            </button>
+          </div>
+          <div class="pa-grid-3">
+            <div class="card chart-card">
+              <div class="card-header"><span class="card-title">Qty produksi per category</span></div>
+              <div class="chart-sub">Total Qty Produksi — DRY / WET / DUC · Generated Infor + BaaN</div>
+              <div id="chartOrdCat"></div>
+              <div class="chart-insight" id="ordCatInsight" style="display:none"></div>
+            </div>
+            <div class="card chart-card">
+              <div class="card-header"><span class="card-title">Produksi per series battery</span></div>
+              <div class="chart-sub">Total Qty Produksi per series (lookup New JIS dari Battery Type)</div>
+              <div id="chartOrdSeries"></div>
+              <div class="chart-insight" id="ordSeriesInsight" style="display:none"></div>
+            </div>
+            <div class="card chart-card">
+              <div class="card-header"><span class="card-title">Type plate digunakan</span></div>
+              <div class="chart-sub">Total Qty Plate (+ dan −) per type plate · Generated Infor + BaaN</div>
+              <div id="chartOrdPlate"></div>
+              <div class="chart-insight" id="ordPlateInsight" style="display:none"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab: Loading per Proses -->
+        <div id="panel-loading" class="pi-panel">
+          <div class="empty-state" style="margin-top:60px">
+            <div class="empty-icon">⚙️</div>
+            <div class="empty-title">Loading per Proses</div>
+            <div class="empty-text">Konten tab ini sedang dalam pengembangan.</div>
+          </div>
+        </div>
+
+        <!-- Tab: Capacity Dashboard -->
+        <div id="panel-capacity" class="pi-panel">
+          <div class="empty-state" style="margin-top:60px">
+            <div class="empty-icon">📊</div>
+            <div class="empty-title">Capacity Dashboard</div>
+            <div class="empty-text">Konten tab ini sedang dalam pengembangan.</div>
+          </div>
         </div>
 
       </div>
@@ -185,318 +318,37 @@
 <div class="pa-tooltip" id="paTooltip"></div>
 
 <script src="shared-components.js"></script>
+<script src="new_jis_series_data.js"></script>
 <script>
-/* ── IndexedDB (read-only, sama dengan resume.html) ── */
-const PiDB = (() => {
-  const DB_NAME = 'bpms_produksi_infor';
-  const STORE   = 'periods';
-  function open() {
-    return new Promise((resolve, reject) => {
-      const req = indexedDB.open(DB_NAME, 1);
-      req.onupgradeneeded = e => e.target.result.createObjectStore(STORE);
-      req.onsuccess = e => resolve(e.target.result);
-      req.onerror   = e => reject(e.target.error);
-    });
-  }
-  async function getPeriods() {
-    const db = await open();
-    return new Promise((resolve, reject) => {
-      const req = db.transaction(STORE, 'readonly').objectStore(STORE).getAllKeys();
-      req.onsuccess = e => resolve(e.target.result || []);
-      req.onerror   = e => reject(e.target.error);
-    });
-  }
-  async function getData(period) {
-    const db = await open();
-    return new Promise((resolve, reject) => {
-      const req = db.transaction(STORE, 'readonly').objectStore(STORE).get(period);
-      req.onsuccess = e => resolve(e.target.result || []);
-      req.onerror   = e => reject(e.target.error);
-    });
-  }
-  async function setData(period, rows) {
-    const db = await open();
-    return new Promise((resolve, reject) => {
-      const req = db.transaction(STORE, 'readwrite').objectStore(STORE).put(rows, period);
-      req.onsuccess = () => resolve(true);
-      req.onerror   = () => reject(req.error);
-    });
-  }
-  return { getPeriods, getData, setData };
-})();
-
-const PiBaanDB = (() => {
-  const DB_NAME = 'bpms_produksi_baan';
-  const STORE   = 'periods';
-  function open() {
-    return new Promise((resolve, reject) => {
-      const req = indexedDB.open(DB_NAME, 1);
-      req.onupgradeneeded = e => e.target.result.createObjectStore(STORE);
-      req.onsuccess = e => resolve(e.target.result);
-      req.onerror   = e => reject(e.target.error);
-    });
-  }
-  async function getPeriods() {
-    const db = await open();
-    return new Promise((resolve, reject) => {
-      const req = db.transaction(STORE, 'readonly').objectStore(STORE).getAllKeys();
-      req.onsuccess = e => resolve(e.target.result || []);
-      req.onerror   = e => reject(e.target.error);
-    });
-  }
-  async function getData(period) {
-    const db = await open();
-    return new Promise((resolve, reject) => {
-      const req = db.transaction(STORE, 'readonly').objectStore(STORE).get(period);
-      req.onsuccess = e => resolve(e.target.result || []);
-      req.onerror   = e => reject(e.target.error);
-    });
-  }
-  async function setData(period, rows) {
-    const db = await open();
-    return new Promise((resolve, reject) => {
-      const req = db.transaction(STORE, 'readwrite').objectStore(STORE).put(rows, period);
-      req.onsuccess = () => resolve(true);
-      req.onerror   = () => reject(req.error);
-    });
-  }
-  return { getPeriods, getData, setData };
-})();
-
+/* Loading data + agregasi kini terpusat di BPMS.loadProdAggregates (shared-components.js) */
 const YEARS = [2013,2014,2015,2016,2017,2018,2019,2020,2021,2022,2023,2024,2025];
-
-/* ── Lookup & konversi (sama dengan resume.html) ── */
-function findColKeyPI(rowSample, ...patterns) {
-  const keys = Object.keys(rowSample);
-  for (const pat of patterns) {
-    const k = keys.find(k => k.trim().toLowerCase() === pat.toLowerCase());
-    if (k) return k;
-  }
-  for (const pat of patterns) {
-    const k = keys.find(k => k.trim().toLowerCase().includes(pat.toLowerCase()));
-    if (k) return k;
-  }
-  return null;
-}
-
-function buildLookupMapsPI() {
-  const state = BPMS.getState();
-
-  const plateMap = new Map();
-  const plateRows = state.dbPlateInfor || [];
-  if (plateRows.length) {
-    const s    = plateRows[0];
-    const vals = Object.keys(s);
-    const kKey = findColKeyPI(s, 'Item Data Infor', 'ItemDataInfor') || vals[1];
-    const kPnP = findColKeyPI(s, 'PN Plate Positif', 'PN Positif')   || vals[2];
-    const kQtP = findColKeyPI(s, 'Qty Plate Positif', 'Qty Positif') || vals[3];
-    const kPnN = findColKeyPI(s, 'PN Plate Negatif', 'PN Negatif')   || vals[4];
-    const kQtN = findColKeyPI(s, 'Qty Plate Negatif', 'Qty Negatif') || vals[5];
-    plateRows.forEach(row => {
-      const key = String(row[kKey] ?? '').trim();
-      if (!key) return;
-      plateMap.set(key, {
-        pnPos : String(row[kPnP] ?? ''),
-        qtyPos: Number(row[kQtP]) || 0,
-        pnNeg : String(row[kPnN] ?? ''),
-        qtyNeg: Number(row[kQtN]) || 0,
-      });
-    });
-  }
-
-  const typeMap = new Map();
-  const typeRows = state.dbTypePlate || [];
-  if (typeRows.length) {
-    const s     = typeRows[0];
-    const vals  = Object.keys(s);
-    const kCode = findColKeyPI(s, 'Type Plate', 'Code') || vals[2];
-    const kGrid = findColKeyPI(s, 'Grid Process', 'Grid') || vals[3];
-    typeRows.forEach(row => {
-      const key = String(row[kCode] ?? '').trim();
-      if (key) typeMap.set(key, String(row[kGrid] ?? ''));
-    });
-  }
-
-  const puLeMap = new Map();
-  const puLeRows = state.dbPuLe || [];
-  if (puLeRows.length) {
-    const s      = puLeRows[0];
-    const vals   = Object.keys(s);
-    const kPN    = findColKeyPI(s, 'PN Plate Infor', 'PN Plate', 'PN') || vals[2];
-    const kRatio = findColKeyPI(s, 'Qty Pule/Plate (kg)', 'Qty Pule/Plate', 'Qty Pule') || vals[4];
-    puLeRows.forEach(row => {
-      const key = String(row[kPN] ?? '').trim();
-      if (key) puLeMap.set(key, Number(row[kRatio]) || 0);
-    });
-  }
-
-  return { plateMap, typeMap, puLeMap };
-}
-
-function puleKeyPI(pn) {
-  return pn.charAt(2) === 'F' ? 'W-UNPL-' + pn.substring(7) : pn;
-}
-
-function gridProcessFromPN(pn) {
-  if (!pn) return '';
-  const parts = pn.split('-');
-  if (parts.length < 3) return '';
-  const c = parts[2].charAt(0);
-  if (c === 'W') return 'Grid Punching';
-  if (c === 'C' || c === 'D') return 'Grid Casting';
-  return 'Calcium Casting';
-}
-
-function computeGenPiRow(r, maps) {
-  const { plateMap, typeMap, puLeMap } = maps;
-  const item = r.item || '';
-  const qty  = r.qty  || 0;
-  const code = item.charAt(4);
-  let itemBattery = item;
-  if (item.charAt(0) === 'W') {
-    const c = item.split('');
-    c[0] = 'F'; c[4] = 'W';
-    itemBattery = c.join('');
-  }
-  const codeBattery = itemBattery.substring(2, 19);
-  const year        = r.trxDate ? String(r.trxDate).slice(-4) : '';
-  const wo          = String(r.orderNo || '').substring(0, 4);
-  const pv    = plateMap.get(codeBattery) || {};
-  const pnPos = pv.pnPos  || '';
-  const qpPos = (pv.qtyPos || 0) * qty;
-  const pnNeg = pv.pnNeg  || '';
-  const qpNeg = (pv.qtyNeg || 0) * qty;
-  const gridPos = typeMap.get(pnPos.substring(7, 11)) || gridProcessFromPN(pnPos);
-  const gridNeg = typeMap.get(pnNeg.substring(7, 11)) || gridProcessFromPN(pnNeg);
-  const qPulePos = Math.round((puLeMap.get(puleKeyPI(pnPos)) || 0) * qpPos);
-  const qPuleNeg = Math.round((puLeMap.get(puleKeyPI(pnNeg)) || 0) * qpNeg);
-  return { wo, code, year, qty, gridPos, qpPos, qPulePos, gridNeg, qpNeg, qPuleNeg };
-}
-
-/* ── Data loaders (server-first → IndexedDB fallback) ── */
-async function loadInforRows() {
-  let periods = [];
-  let serverAvailable = false;
-  try {
-    const r = await fetch('api/produksi-infor.php', { cache: 'no-store' });
-    if (r.ok) {
-      const j = await r.json();
-      if (j.ok && Array.isArray(j.periods)) { periods = j.periods; serverAvailable = true; }
-    }
-  } catch (_) {}
-  if (!periods.length) {
-    try { periods = await PiDB.getPeriods(); } catch (_) {}
-  }
-  if (!periods.length) return { rows: [], periods: 0 };
-
-  const results = await Promise.all(periods.map(async p => {
-    if (serverAvailable) {
-      try {
-        const r = await fetch('api/produksi-infor.php?period=' + p, { cache: 'no-store' });
-        if (r.ok) {
-          const j = await r.json();
-          if (j.ok && Array.isArray(j.data) && j.data.length) {
-            try { await PiDB.setData(p, j.data); } catch (_) {}
-            return j.data;
-          }
-        }
-      } catch (_) {}
-    }
-    try {
-      const cached = await PiDB.getData(p);
-      if (cached && cached.length) return cached;
-    } catch (_) {}
-    return [];
-  }));
-  return { rows: results.flat(), periods: periods.length };
-}
-
-async function loadBaanRows() {
-  let periods = [];
-  let serverAvailable = false;
-  try {
-    const r = await fetch('api/produksi-baan.php', { cache: 'no-store' });
-    if (r.ok) {
-      const j = await r.json();
-      if (j.ok && Array.isArray(j.periods)) { periods = j.periods; serverAvailable = true; }
-    }
-  } catch (_) {}
-  if (!periods.length) {
-    try { periods = await PiBaanDB.getPeriods(); } catch (_) {}
-  }
-  if (!periods.length) return [];
-
-  const results = await Promise.all(periods.map(async p => {
-    if (serverAvailable) {
-      try {
-        const r = await fetch('api/produksi-baan.php?period=' + p, { cache: 'no-store' });
-        if (r.ok) {
-          const j = await r.json();
-          if (j.ok && Array.isArray(j.data) && j.data.length) {
-            try { await PiBaanDB.setData(p, j.data); } catch (_) {}
-            return j.data;
-          }
-        }
-      } catch (_) {}
-    }
-    try {
-      const cached = await PiBaanDB.getData(p);
-      if (cached && cached.length) return cached;
-    } catch (_) {}
-    return [];
-  }));
-  return results.flat();
-}
-
-/* ── Agregasi per tahun (logika identik dengan resume.html) ── */
-function computeYearData(inforRows, baanRows, maps) {
-  const acc = {};
-  const get = y => (acc[y] = acc[y] || { asm:0, gc:0, gp:0, bm:0, fm:0, has:false });
-
-  for (const r of inforRows) {
-    const g = computeGenPiRow(r, maps);
-    if (g.wo !== 'PKAB' && g.wo !== 'PKAS') continue;
-    if (!/^\d{4}$/.test(g.year)) continue;
-    const a = get(g.year);
-    a.has  = true;
-    a.asm += Number(r.qty) || 0;
-    if (g.gridPos === 'Grid Casting')  a.gc += g.qpPos;
-    if (g.gridNeg === 'Grid Casting')  a.gc += g.qpNeg;
-    if (g.gridPos === 'Grid Punching') a.gp += g.qpPos;
-    if (g.gridNeg === 'Grid Punching') a.gp += g.qpNeg;
-    a.bm += (g.qPulePos || 0) + (g.qPuleNeg || 0);
-    if (g.code === 'D') a.fm += g.qpPos + g.qpNeg;
-  }
-
-  // BaaN: field langsung, tanpa filter WO
-  for (const r of baanRows) {
-    const y = String(r.year || '');
-    if (!/^\d{4}$/.test(y)) continue;
-    const a = get(y);
-    a.has  = true;
-    a.asm += Number(r.qtyProduksi) || 0;
-    if (r.gridPos === 'Grid Casting')  a.gc += Number(r.qpPos) || 0;
-    if (r.gridNeg === 'Grid Casting')  a.gc += Number(r.qpNeg) || 0;
-    if (r.gridPos === 'Grid Punching') a.gp += Number(r.qpPos) || 0;
-    if (r.gridNeg === 'Grid Punching') a.gp += Number(r.qpNeg) || 0;
-    a.bm += (Number(r.qPulePos) || 0) + (Number(r.qPuleNeg) || 0);
-    if (r.code === 'D') a.fm += (Number(r.qpPos) || 0) + (Number(r.qpNeg) || 0);
-  }
-
-  // Parameter turunan
-  for (const y of Object.keys(acc)) {
-    const a = acc[y];
-    const plates = a.gc + a.gp;
-    a.plateBattery     = a.asm   ? plates / a.asm : null;
-    a.beratLeadBattery = a.asm && a.bm ? a.bm / a.asm : null;
-    a.beratLeadPanel   = plates && a.bm ? a.bm / plates : null;
-  }
-  return acc;
-}
 
 /* ── Format helpers ── */
 function fmtID(n, dec = 0) {
   return Number(n).toLocaleString('id-ID', { minimumFractionDigits: dec, maximumFractionDigits: dec });
+}
+
+/* ── Insight caption (judul card tetap statis; insight dinamis di caption) ── */
+function setInsight(id, html) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  if (!html) { el.style.display = 'none'; el.innerHTML = ''; return; }
+  el.innerHTML = html;
+  el.style.display = '';
+}
+
+/* Insight tren: nilai tahun terakhir + arah perubahan vs tahun sebelumnya */
+function trendInsight(points, name, valFmt) {
+  const valid = points.filter(p => p.value != null);
+  if (!valid.length) return '';
+  const last = valid[valid.length - 1];
+  const prev = valid.length > 1 ? valid[valid.length - 2] : null;
+  if (!prev || !prev.value) return `${name} ${last.year}: <b>${valFmt(last.value)}</b>`;
+  const diff = last.value - prev.value;
+  if (diff === 0) return `${name} ${last.year}: <b>${valFmt(last.value)}</b> — <b>stabil</b> vs ${prev.year}`;
+  const arah = diff > 0 ? 'naik' : 'turun';
+  const pct  = Math.abs((diff / prev.value) * 100);
+  return `${name} ${last.year}: <b>${valFmt(last.value)}</b> — <b>${arah} ${fmtID(pct, 1)}%</b> vs ${prev.year}`;
 }
 function fmtCompact(n) {
   if (n >= 1e6) return fmtID(n / 1e6, 1) + ' jt';
@@ -693,6 +545,111 @@ function renderLineChart(containerId, points, opts) {
   container.appendChild(svg);
 }
 
+/* ── Multi-line chart (≤3 seri, baseline nol, label langsung di ujung garis) ── */
+function renderMultiLineChart(containerId, points, series) {
+  // points: [{year, values:[v1, v2, v3]}] — null berarti tahun tanpa data
+  const container = document.getElementById(containerId);
+  container.innerHTML = '';
+  const hasData = points.some(p => p.values.some(v => v));
+  if (!hasData) {
+    container.innerHTML = '<div class="pa-footnote" style="padding:24px 0;text-align:center">Belum ada data</div>';
+    return;
+  }
+
+  const W = 620, H = 260, mL = 48, mR = 60, mT = 14, mB = 24;
+  const iW = W - mL - mR, iH = H - mT - mB;
+  const n  = points.length;
+  const band = iW / n;
+  const xAt  = i => mL + band * i + band / 2;
+
+  // Baseline nol: perbandingan besaran antar category harus jujur
+  const maxV  = Math.max(...points.flatMap(p => p.values.filter(v => v != null)));
+  const ticks = niceTicks(maxV, 5);
+  const top   = ticks[ticks.length - 1] || 1;
+  const yAt   = v => mT + iH - (v / top) * iH;
+
+  const svg = svgEl('svg', { viewBox: `0 0 ${W} ${H}`, class: 'chart-svg' });
+
+  for (const tv of ticks) {
+    svg.appendChild(svgEl('line', { x1: mL, y1: yAt(tv), x2: W - mR, y2: yAt(tv), stroke: 'var(--gridline)', 'stroke-width': 1 }));
+    const t = svgEl('text', { x: mL - 6, y: yAt(tv) + 3.5, 'text-anchor': 'end', class: 'ax' });
+    t.textContent = fmtCompact(tv);
+    svg.appendChild(t);
+  }
+  svg.appendChild(svgEl('line', { x1: mL, y1: mT + iH, x2: W - mR, y2: mT + iH, stroke: 'var(--baseline)', 'stroke-width': 1 }));
+
+  points.forEach((p, i) => {
+    const t = svgEl('text', { x: xAt(i), y: H - 6, 'text-anchor': 'middle', class: 'ax' });
+    t.textContent = p.year;
+    svg.appendChild(t);
+  });
+
+  const rootStyle = getComputedStyle(document.querySelector('.pa-root'));
+  const colors = series.map(s => rootStyle.getPropertyValue(s.cssVar).trim());
+
+  // Garis per seri + titik akhir
+  const endLabels = [];
+  series.forEach((s, si) => {
+    const segs = [];
+    let cur = [];
+    points.forEach((p, i) => {
+      if (p.values[si] != null) cur.push({ i, v: p.values[si] });
+      else { if (cur.length) segs.push(cur); cur = []; }
+    });
+    if (cur.length) segs.push(cur);
+    if (!segs.length) return;
+
+    for (const seg of segs) {
+      if (seg.length > 1) {
+        const d = seg.map((pt, j) => `${j ? 'L' : 'M'}${xAt(pt.i)},${yAt(pt.v)}`).join(' ');
+        svg.appendChild(svgEl('path', { d, fill: 'none', stroke: colors[si], 'stroke-width': 2, 'stroke-linejoin': 'round', 'stroke-linecap': 'round' }));
+      }
+    }
+    const lastSeg = segs[segs.length - 1];
+    const last    = lastSeg[lastSeg.length - 1];
+    svg.appendChild(svgEl('circle', { cx: xAt(last.i), cy: yAt(last.v), r: 4, fill: colors[si], stroke: '#ffffff', 'stroke-width': 2 }));
+    endLabels.push({ y: yAt(last.v), text: s.key, color: colors[si] });
+  });
+
+  // Label langsung di ujung garis; geser jika bertabrakan
+  endLabels.sort((a, b) => a.y - b.y);
+  const GAP = 13;
+  for (let i = 1; i < endLabels.length; i++) {
+    if (endLabels[i].y - endLabels[i - 1].y < GAP) endLabels[i].y = endLabels[i - 1].y + GAP;
+  }
+  for (let i = endLabels.length - 1; i >= 0; i--) {
+    const maxY = mT + iH - (endLabels.length - 1 - i) * GAP;
+    if (endLabels[i].y > maxY) endLabels[i].y = maxY;
+  }
+  for (const lbl of endLabels) {
+    const t = svgEl('text', { x: W - mR + 8, y: lbl.y + 3.5, 'text-anchor': 'start', class: 'dl', fill: lbl.color });
+    t.style.fill = lbl.color;
+    t.textContent = lbl.text;
+    svg.appendChild(t);
+  }
+
+  // Crosshair + tooltip berisi semua seri pada tahun yang di-hover
+  const cross = svgEl('line', { x1: 0, y1: mT, x2: 0, y2: mT + iH, stroke: 'var(--baseline)', 'stroke-width': 1, visibility: 'hidden' });
+  svg.appendChild(cross);
+  points.forEach((p, i) => {
+    const hit = svgEl('rect', { x: mL + band * i, y: 0, width: band, height: H, fill: 'transparent' });
+    hit.addEventListener('pointermove', evt => {
+      cross.setAttribute('x1', xAt(i));
+      cross.setAttribute('x2', xAt(i));
+      cross.setAttribute('visibility', 'visible');
+      showTooltip(evt, String(p.year), series.map((s, si) => ({
+        color: colors[si],
+        value: p.values[si] != null ? fmtID(Math.round(p.values[si])) : '—',
+        label: s.key,
+      })));
+    });
+    hit.addEventListener('pointerleave', () => { cross.setAttribute('visibility', 'hidden'); hideTooltip(); });
+    svg.appendChild(hit);
+  });
+
+  container.appendChild(svg);
+}
+
 /* ── Column chart (stacked ≤2 seri / single, per-mark tooltip) ── */
 function renderColumnChart(containerId, points, series, opts) {
   // points: [{year, values:[v1, v2?]}]; series: [{label, cssVar}]
@@ -836,23 +793,39 @@ function renderKpi(valueId, deltaId, sparkId, seriesPoints, opts) {
   }));
 }
 
-/* ── Main render ── */
-async function loadDashboard() {
+/* ── Main render ──
+   Data + agregasi dari BPMS.loadProdAggregates (shared-components.js):
+   cek versi ke server → cache localStorage bila tidak berubah → hitung ulang bila berubah / force. */
+async function loadDashboard(force = false) {
   const status = document.getElementById('loadStatus');
   status.textContent = 'Memuat data…';
   try {
-    const [infor, baanRows] = await Promise.all([loadInforRows(), loadBaanRows()]);
-    if (!infor.rows.length && !baanRows.length) {
+    const res = await BPMS.loadProdAggregates({ force });
+    const Y   = res.years || {};
+    if (!Object.keys(Y).length) {
       status.textContent = 'Belum ada data Produksi Infor maupun BaaN.';
       return;
     }
 
-    const maps = buildLookupMapsPI();
-    const acc  = computeYearData(infor.rows, baanRows, maps);
+    // Turunan per tahun dari agregat bersama
+    const D = {};
+    for (const k of Object.keys(Y)) {
+      const a      = Y[k];
+      const gc     = a.gcPos + a.gcNeg;
+      const gp     = a.gpPos + a.gpNeg;
+      const plates = gc + gp;
+      const bmT    = a.bmPos + a.bmNeg;
+      D[k] = {
+        asm: a.asm, gc, gp, cat: a.cat,
+        plateBattery:     a.asm ? plates / a.asm : null,
+        beratLeadBattery: (a.asm && bmT) ? bmT / a.asm : null,
+        beratLeadPanel:   (plates && bmT) ? bmT / plates : null,
+      };
+    }
 
     const pts = key => YEARS.map(y => {
-      const a = acc[String(y)];
-      return { year: y, value: a && a.has && a[key] != null && a[key] !== 0 ? a[key] : null };
+      const d = D[String(y)];
+      return { year: y, value: d && d[key] ? d[key] : null };
     });
 
     const plateSeries     = pts('plateBattery');
@@ -866,44 +839,269 @@ async function loadDashboard() {
     renderKpi('kpiLeadPanel', 'kpiLeadPanelDelta', 'sparkLeadPanel', leadPanelSeries, { valFmt: v => fmtID(v, 3) });
     renderKpi('kpiAsm',       'kpiAsmDelta',       'sparkAsm',       asmSeries,       { valFmt: v => fmtCompact(Math.round(v)), valenced: true });
 
-    // Parameter trends (small multiples, single series)
+    // Parameter trends (small multiples, single series) + insight caption
     renderLineChart('chartPlate',     plateSeries,     { seriesLabel: 'Plate/battery',      valFmt: v => fmtID(v, 1) });
     renderLineChart('chartLeadBat',   leadBatSeries,   { seriesLabel: 'Berat lead/battery', valFmt: v => fmtID(v, 1) });
     renderLineChart('chartLeadPanel', leadPanelSeries, { seriesLabel: 'Berat lead/panel',   valFmt: v => fmtID(v, 3) });
+    setInsight('plateInsight',     trendInsight(plateSeries,     'Plate/battery',      v => fmtID(v, 1)));
+    setInsight('leadBatInsight',   trendInsight(leadBatSeries,   'Berat lead/battery', v => fmtID(v, 1) + ' kg'));
+    setInsight('leadPanelInsight', trendInsight(leadPanelSeries, 'Berat lead/panel',   v => fmtID(v, 3) + ' kg'));
 
     // Volume plate: stacked Grid Casting + Grid Punching
     const volPoints = YEARS.map(y => {
-      const a = acc[String(y)];
-      return { year: y, values: [a ? a.gc : 0, a ? a.gp : 0] };
+      const d = D[String(y)];
+      return { year: y, values: [d ? d.gc : 0, d ? d.gp : 0] };
     });
     renderColumnChart('chartVolume', volPoints, [
       { label: 'Grid Casting',  cssVar: '--series-1' },
       { label: 'Grid Punching', cssVar: '--series-2' },
     ]);
+    let volInsight = '';
+    {
+      let li = -1;
+      volPoints.forEach((p, i) => { if (p.values.some(v => v)) li = i; });
+      if (li >= 0) {
+        const [gc, gp] = volPoints[li].values;
+        const tot = gc + gp;
+        if (tot) {
+          volInsight = `Total plate ${volPoints[li].year}: <b>${fmtCompact(tot)}</b> — ` +
+            `Grid Casting <b>${Math.round((gc / tot) * 100)}%</b>, Grid Punching <b>${Math.round((gp / tot) * 100)}%</b>`;
+        }
+      }
+    }
+    setInsight('volInsight', volInsight);
 
     // Assembling: single series column
     const asmPoints = YEARS.map(y => {
-      const a = acc[String(y)];
-      return { year: y, values: [a ? a.asm : 0] };
+      const d = D[String(y)];
+      return { year: y, values: [d ? d.asm : 0] };
     });
     renderColumnChart('chartAsm', asmPoints, [
       { label: 'Assembling', cssVar: '--series-1' },
     ]);
+    setInsight('asmInsight', trendInsight(asmSeries, 'Assembling', v => fmtCompact(Math.round(v)) + ' pcs'));
 
-    status.textContent =
-      `Infor: ${infor.rows.length.toLocaleString('id-ID')} record (${infor.periods} periode) · BaaN: ${baanRows.length.toLocaleString('id-ID')} record`;
+    // Trend produksi per category (DRY / WET / DUC)
+    const CATS = [
+      { key: 'DRY', cssVar: '--series-1' },
+      { key: 'WET', cssVar: '--series-2' },
+      { key: 'DUC', cssVar: '--series-3' },
+    ];
+    const catPoints = YEARS.map(y => {
+      const d = D[String(y)];
+      return { year: y, values: CATS.map(c => d ? (d.cat[c.key] || 0) : null) };
+    });
+    // Insight caption: category dominan pada tahun terakhir yang ada datanya
+    let catInsight = '';
+    let lastCatIdx = -1;
+    catPoints.forEach((p, i) => { if (p.values.some(v => v)) lastCatIdx = i; });
+    if (lastCatIdx >= 0) {
+      const vals  = catPoints[lastCatIdx].values.map(v => v || 0);
+      const total = vals.reduce((s, v) => s + v, 0);
+      if (total) {
+        const maxI = vals.indexOf(Math.max(...vals));
+        const pct  = Math.round((vals[maxI] / total) * 100);
+        catInsight = `<b>${CATS[maxI].key}</b> mendominasi produksi: <b>${pct}%</b> dari qty ${catPoints[lastCatIdx].year}`;
+      }
+    }
+    setInsight('catInsight', catInsight);
+    renderMultiLineChart('chartCategory', catPoints, CATS);
+
+    const m = res.meta || {};
+    let statusText = `Infor: ${(m.inforCount || 0).toLocaleString('id-ID')} record (${m.inforPeriods || 0} periode) · BaaN: ${(m.baanCount || 0).toLocaleString('id-ID')} record`;
+    if (res.fromCache) statusText += res.offline ? ' · cache (server tidak terjangkau)' : ' · dari cache';
+    status.textContent = statusText;
   } catch (err) {
     status.textContent = `Gagal memuat data: ${err.message}`;
+  }
+}
+
+/* ── Tab Summary Order ─────────────────────────────────────────────
+   Sumber: Generated Data Produksi Infor (WO PKAB/PKAS) + Generated Data Produksi BaaN,
+   via agregat terpusat BPMS.loadProdAggregates (ikut cache versi — cepat).
+   1. Qty per category — DRY/WET/DUC (sum semua tahun dari agregat)
+   2. Qty per series   — Battery Type → lookup New JIS (dihitung di prodAggregate)
+   3. Type plate       — kode plate MID(PN Plate, 8, 4), qty plate + dan − */
+
+let _orderLoaded = false;
+let _orderRes = null; // hasil BPMS.loadProdAggregates terakhir — dipakai ulang saat filter tahun berganti (tanpa fetch ulang)
+
+/* Top-N terbesar + sisanya digabung "Lainnya" (di posisi terakhir, warna redup) */
+function topNWithOther(entries, n) {
+  const sorted = entries.slice().sort((a, b) => b[1] - a[1]);
+  const top    = sorted.slice(0, n).map(([label, value]) => ({ label, value }));
+  const rest   = sorted.slice(n).reduce((s, [, v]) => s + v, 0);
+  if (rest > 0) top.push({ label: 'Lainnya', value: rest, muted: true });
+  return top;
+}
+
+/* Horizontal bar list: label kiri, nilai langsung di ujung bar (tanpa axis) */
+function renderHBarChart(containerId, items, opts = {}) {
+  const container = document.getElementById(containerId);
+  container.innerHTML = '';
+  const data = items.filter(i => i.value > 0);
+  if (!data.length) {
+    container.innerHTML = '<div class="pa-footnote" style="padding:24px 0;text-align:center">Belum ada data</div>';
+    return;
+  }
+
+  const W = 520, ROW = 27, BAR_H = 18;
+  const labelW = opts.labelW || 78;
+  const valueW = 96;
+  const H = data.length * ROW + 6;
+  const maxV = Math.max(...data.map(i => i.value));
+  const barMax = W - labelW - valueW;
+
+  const svg = svgEl('svg', { viewBox: `0 0 ${W} ${H}`, class: 'chart-svg' });
+  data.forEach((it, i) => {
+    const y  = i * ROW + 3;
+    const bw = Math.max((it.value / maxV) * barMax, 2);
+    const fill = it.muted ? 'var(--baseline)' : `var(${it.cssVar || '--series-1'})`;
+
+    const lbl = svgEl('text', { x: labelW - 8, y: y + BAR_H / 2 + 3.5, 'text-anchor': 'end', class: 'ax' });
+    lbl.textContent = it.label;
+    svg.appendChild(lbl);
+
+    svg.appendChild(svgEl('rect', { x: labelW, y, width: bw, height: BAR_H, rx: 3, fill }));
+
+    const val = svgEl('text', { x: labelW + bw + 6, y: y + BAR_H / 2 + 3.5, 'text-anchor': 'start', class: 'dl' });
+    val.textContent = fmtID(Math.round(it.value)) + (it.pct != null ? ` (${it.pct}%)` : '');
+    svg.appendChild(val);
+  });
+  container.appendChild(svg);
+}
+
+/* Isi ulang dropdown filter tahun, sambil coba pertahankan pilihan tahun yang sedang aktif */
+function populateOrderYearFilter(years) {
+  const sel = document.getElementById('orderYearFilter');
+  const prev = sel.value;
+  const sorted = years.slice().sort((a, b) => b - a); // terbaru dulu
+  sel.innerHTML = '<option value="">Semua Tahun</option>' +
+    sorted.map(y => `<option value="${y}">${y}</option>`).join('');
+  sel.value = sorted.includes(prev) ? prev : '';
+}
+
+/* Render ulang 3 card Summary Order dari _orderRes, difilter sesuai tahun terpilih (kosong = semua tahun) */
+function renderSummaryOrder() {
+  const res = _orderRes;
+  if (!res) return;
+  const Y      = res.years || {};
+  const year   = document.getElementById('orderYearFilter').value;
+  const yKeys  = year ? [year] : Object.keys(Y);
+
+  // Card 1: Qty produksi per category (warna konsisten dgn Overview)
+  const catQty = { DRY: 0, WET: 0, DUC: 0 };
+  for (const k of yKeys) {
+    const c = (Y[k] || {}).cat || {};
+    catQty.DRY += c.DRY || 0;
+    catQty.WET += c.WET || 0;
+    catQty.DUC += c.DUC || 0;
+  }
+  const catItems = [
+    { label: 'DRY', value: catQty.DRY, cssVar: '--series-1' },
+    { label: 'WET', value: catQty.WET, cssVar: '--series-2' },
+    { label: 'DUC', value: catQty.DUC, cssVar: '--series-3' },
+  ].sort((a, b) => b.value - a.value);
+  const catTotal = catQty.DRY + catQty.WET + catQty.DUC;
+  if (catTotal) {
+    catItems.forEach(i => { i.pct = Math.round((i.value / catTotal) * 100); });
+  }
+  renderHBarChart('chartOrdCat', catItems);
+  setInsight('ordCatInsight', catTotal
+    ? `<b>${catItems[0].label}</b> mendominasi: <b>${catItems[0].pct}%</b> dari total qty produksi${year ? ` (${year})` : ''}`
+    : '');
+
+  // Card 2: top series battery + insight caption (per tahun bila difilter, gabungan bila "Semua Tahun")
+  const seriesAgg = {};
+  for (const k of yKeys) {
+    const s = (Y[k] || {}).series || {};
+    for (const key of Object.keys(s)) seriesAgg[key] = (seriesAgg[key] || 0) + s[key];
+  }
+  const seriesItems = topNWithOther(Object.entries(seriesAgg), 10);
+  const seriesTotal = Object.values(seriesAgg).reduce((s, v) => s + v, 0);
+  renderHBarChart('chartOrdSeries', seriesItems);
+  setInsight('ordSeriesInsight', (seriesItems.length && !seriesItems[0].muted && seriesTotal)
+    ? `Series <b>${seriesItems[0].label}</b> paling banyak diproduksi — <b>${Math.round((seriesItems[0].value / seriesTotal) * 100)}%</b> dari total${year ? ` (${year})` : ''}`
+    : '');
+
+  // Card 3: top type plate + insight caption
+  const plateAgg = {};
+  for (const k of yKeys) {
+    const p = (Y[k] || {}).plate || {};
+    for (const key of Object.keys(p)) plateAgg[key] = (plateAgg[key] || 0) + p[key];
+  }
+  const plateItems = topNWithOther(Object.entries(plateAgg), 10);
+  const plateTotal = Object.values(plateAgg).reduce((s, v) => s + v, 0);
+  renderHBarChart('chartOrdPlate', plateItems);
+  setInsight('ordPlateInsight', (plateItems.length && !plateItems[0].muted && plateTotal)
+    ? `Type plate <b>${plateItems[0].label}</b> paling banyak digunakan — <b>${Math.round((plateItems[0].value / plateTotal) * 100)}%</b> dari total qty plate${year ? ` (${year})` : ''}`
+    : '');
+}
+
+async function loadSummaryOrder(force = false) {
+  const status = document.getElementById('orderStatus');
+  status.textContent = 'Memuat data…';
+  try {
+    const res = await BPMS.loadProdAggregates({ force });
+    const Y   = res.years || {};
+    _orderRes = res;
+    if (!Object.keys(Y).length) {
+      status.textContent = 'Belum ada data Produksi Infor maupun BaaN.';
+      populateOrderYearFilter([]);
+      renderHBarChart('chartOrdCat', []);
+      renderHBarChart('chartOrdSeries', []);
+      renderHBarChart('chartOrdPlate', []);
+      setInsight('ordCatInsight', '');
+      setInsight('ordSeriesInsight', '');
+      setInsight('ordPlateInsight', '');
+      return;
+    }
+
+    populateOrderYearFilter(Object.keys(Y));
+    renderSummaryOrder();
+
+    const m = res.meta || {};
+    let s = `Infor: ${(m.inforCount || 0).toLocaleString('id-ID')} record · BaaN: ${(m.baanCount || 0).toLocaleString('id-ID')} record`;
+    if (res.fromCache) s += res.offline ? ' · cache (server tidak terjangkau)' : ' · dari cache';
+    status.textContent = s;
+  } catch (err) {
+    status.textContent = 'Gagal memuat data: ' + err.message;
   }
 }
 
 /* ── Init ── */
 async function pageInit() {
   document.getElementById('topbarMount').innerHTML = BPMS.renderTopbar('Dashboard — Parameter Asumsi');
+
+  document.getElementById('paTabs').addEventListener('click', e => {
+    const btn = e.target.closest('.pi-tab');
+    if (!btn) return;
+    document.querySelectorAll('.pi-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.pi-panel').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('panel-' + btn.dataset.tab).classList.add('active');
+    // Lazy-load: data order dimuat saat tab pertama kali dibuka
+    if (btn.dataset.tab === 'order' && !_orderLoaded) {
+      _orderLoaded = true;
+      loadSummaryOrder();
+    }
+  });
+
+  document.getElementById('orderReloadBtn').addEventListener('click', async () => {
+    const btn = document.getElementById('orderReloadBtn');
+    btn.disabled = true;
+    await loadSummaryOrder(true); // force: abaikan cache, ambil segar dari server
+    btn.disabled = false;
+  });
+
+  document.getElementById('orderYearFilter').addEventListener('change', () => {
+    renderSummaryOrder(); // filter lokal saja — data sudah ada di _orderRes, tidak perlu fetch ulang
+  });
+
   document.getElementById('reloadBtn').addEventListener('click', async () => {
     const btn = document.getElementById('reloadBtn');
     btn.disabled = true;
-    await loadDashboard();
+    await loadDashboard(true); // force: abaikan cache, ambil segar dari server
     btn.disabled = false;
   });
   await loadDashboard();

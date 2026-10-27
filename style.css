@@ -481,14 +481,18 @@ html, body {
 }
 .table-scroll { overflow-x: auto; }
 
-table {
+/* Aturan elemen tabel generik. :where(...) tidak menambah specificity (halaman FAH tidak berubah),
+   tetapi tidak berlaku di halaman Standardized Work (body.sw-portal) yang punya aturan tabel sendiri
+   di sw/sw.css — tanpa ini mis. "tbody tr:last-child td" menghapus garis bawah baris terakhir
+   tabel TSKK / Lembar Observasi, dan "tbody tr:hover td" menimpa warna sel lembar observasi. */
+:where(body:not(.sw-portal)) table {
   width: 100%;
   border-collapse: collapse;
   font-size: 13px;
   background: var(--bg-1);
 }
-thead tr { background: var(--bg-2); border-bottom: 1px solid var(--border-solid2); }
-th {
+:where(body:not(.sw-portal)) thead tr { background: var(--bg-2); border-bottom: 1px solid var(--border-solid2); }
+:where(body:not(.sw-portal)) th {
   padding: 9px 12px;
   text-align: left;
   font-size: 11px;
@@ -498,14 +502,14 @@ th {
   position: relative;
   user-select: none;
 }
-td {
+:where(body:not(.sw-portal)) td {
   padding: 8px 12px;
   color: var(--text-2);
   border-bottom: 1px solid var(--border-subtle);
   white-space: nowrap;
 }
-tbody tr:last-child td { border-bottom: none; }
-tbody tr:hover td { background: var(--bg-2); color: var(--text-1); }
+:where(body:not(.sw-portal)) tbody tr:last-child td { border-bottom: none; }
+:where(body:not(.sw-portal)) tbody tr:hover td { background: var(--bg-2); color: var(--text-1); }
 
 .th-filter {
   cursor: pointer;

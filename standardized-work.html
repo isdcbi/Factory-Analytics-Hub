@@ -1,0 +1,1115 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Standardized Work — Factory Analytics Hub</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="sw/sw.css">
+</head>
+<!-- Modul Standardized Work: satu halaman, view per hash (#observasi, #tskk, ...) dari <template id="tpl-...">.
+     Sidebar dari shared-components.js (FAH); data disimpan terpisah via api/sw-state.php. -->
+<body class="sw-portal" data-page="home" data-bpms-sync="off">
+  <div class="app-layout">
+    <div id="sidebarMount"></div>
+
+    <div class="main-content">
+      <div class="topbar">
+        <button type="button" class="hamburger-btn" id="hamburgerBtn" aria-label="Buka menu">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M1 3h14v1.5H1V3zm0 4.5h14V9H1V7.5zm0 4.5h14v1.5H1V12z"/></svg>
+        </button>
+        <span class="topbar-title" id="topbarTitle">Dashboard</span>
+        <span class="topbar-sub" id="topbarSub"></span>
+        <div class="topbar-actions" id="topbarActions"></div>
+      </div>
+      <main class="page-body" id="appView"></main>
+    </div>
+  </div>
+
+  <!-- ══════════════════ VIEW: Dashboard ══════════════════ -->
+  <template id="tpl-home">
+    <header class="page-header">
+      <h2>Dashboard Standardized Work</h2>
+      <p>Ringkasan data shopfloor dan akses cepat ke semua tools standardized work.</p>
+    </header>
+
+
+    <section class="card-grid">
+      <article class="card stat-card">
+        <h3>Total Proses</h3>
+        <p id="homeProcessCount" class="stat-value">0</p>
+      </article>
+      <article class="card stat-card">
+        <h3>Total Operator</h3>
+        <p id="homeOperatorCount" class="stat-value">0</p>
+      </article>
+      <article class="card stat-card">
+        <h3>Rata-rata Cycle Time</h3>
+        <p id="homeAvgCycle" class="stat-value">0 detik</p>
+      </article>
+      <article class="card stat-card">
+        <h3>Data Aktif</h3>
+        <p id="homeActiveData" class="stat-value">Belum dipilih</p>
+      </article>
+    </section>
+
+    <section class="card">
+      <div class="card-header">
+        <h3>Data Observasi Terakhir</h3>
+        <a class="text-link" href="#observasi">Input data baru</a>
+      </div>
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>Proses</th>
+              <th>Operator</th>
+              <th>Cycle Time (detik)</th>
+              <th>Tanggal</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody id="homeLatestBody">
+            <tr>
+              <td colspan="5" class="placeholder">Belum ada data observasi.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </template>
+
+  <!-- ══════════════════ VIEW: Lembar Observasi ══════════════════ -->
+  <template id="tpl-observasi">
+    <header class="page-header">
+      <h2>Lembar Observasi</h2>
+      <p>Masukkan data elemen kerja dan waktu sample. Data tersimpan otomatis.</p>
+    </header>
+
+
+    <section class="card hidden" id="lineImportSection">
+      <div class="card-header">
+        <div>
+          <h3 id="lineImportTitle">Pratinjau Import Form 1 Line</h3>
+          <p class="helper-text">Periksa daftar proses di bawah. Hilangkan centang untuk proses yang tidak ingin disimpan.</p>
+        </div>
+      </div>
+      <div id="lineImportSummary" class="obs-revision-summary line-import-summary"></div>
+      <p id="lineImportWarn" class="line-import-warn hidden"></p>
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th class="line-import-check"><input type="checkbox" id="lineImportAll" checked aria-label="Pilih semua proses"></th>
+              <th>No</th>
+              <th>Proses</th>
+              <th>Operator</th>
+              <th>Jumlah Elemen</th>
+              <th>Total CT (sec/batt)</th>
+              <th>Status Simpan</th>
+            </tr>
+          </thead>
+          <tbody id="lineImportBody"></tbody>
+        </table>
+      </div>
+      <label id="lineImportNoteWrap" class="line-import-note hidden">
+        Catatan revisi (untuk proses yang sudah ada)
+        <input id="lineImportNote" type="text" maxlength="160">
+      </label>
+      <div class="obs-action-group line-import-actions">
+        <button type="button" id="lineImportSaveBtn" class="btn primary">Simpan</button>
+        <button type="button" id="lineImportCancelBtn" class="btn ghost">Batal</button>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="card-header">
+        <h3>Input Observasi Baru</h3>
+        <div class="obs-action-group">
+          <button type="button" id="downloadObservasiFormBtn" class="btn ghost">Form Excel 1 Proses</button>
+          <button type="button" id="downloadObservasiLineFormBtn" class="btn ghost">Form Excel 1 Line</button>
+          <label class="btn file-btn" for="importObservasiInput">
+            Import Excel
+            <input id="importObservasiInput" type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
+          </label>
+        </div>
+      </div>
+      <div class="obs-sheet-wrapper">
+        <table class="obs-sheet-table">
+          <tbody>
+            <tr>
+              <td class="obs-logo-cell" rowspan="4">
+                <img src="sw/CBI_Logo_large1.png" alt="Logo CBI" class="obs-logo-image">
+                <div class="obs-logo-name">PT. Century Batteries Indonesia</div>
+              </td>
+
+              <td class="obs-title-cell" colspan="2" rowspan="3">LEMBAR OBSERVASI</td>
+
+              <td class="obs-field-label">LINE</td>
+              <td class="obs-field-input">
+                <input id="lineName" type="text" placeholder="Contoh: Line 1">
+              </td>
+
+              <td class="obs-field-label">TANGGAL</td>
+              <td class="obs-field-input">
+                <input id="obsTanggal" type="date">
+              </td>
+            </tr>
+
+            <tr>
+              <td class="obs-field-label">PROSES</td>
+              <td class="obs-field-input">
+                <input id="processName" type="text" placeholder="Contoh: Assembly A">
+              </td>
+
+              <td class="obs-field-label">SHIFT / JAM</td>
+              <td class="obs-field-input">
+                <input id="shiftJam" type="text" placeholder="Contoh: Shift 1 / 07:00-15:00">
+              </td>
+            </tr>
+
+            <tr>
+              <td class="obs-field-label">TIPE PRODUK</td>
+              <td class="obs-field-input">
+                <input id="productType" type="text" placeholder="Contoh: NS40Z">
+              </td>
+
+              <td class="obs-field-label">NAMA OBSERVER</td>
+              <td class="obs-field-input">
+                <input id="observerName" type="text" placeholder="Contoh: Andi">
+              </td>
+            </tr>
+
+            <tr>
+              <td class="obs-field-label">NO FORM</td>
+              <td class="obs-fixed-cell">
+                <span id="noFormValue" class="obs-fixed-value">Form-ISD-ISD-001</span>
+              </td>
+
+              <td class="obs-field-label">TAKT TIME</td>
+              <td class="obs-field-input">
+                <input id="taktTimeInput" type="number" min="0" step="0.01" placeholder="Detik">
+              </td>
+
+              <td class="obs-field-label">NAMA OPERATOR</td>
+              <td class="obs-field-input">
+                <input id="operatorName" type="text" placeholder="Contoh: Budi">
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="table-toolbar">
+        <button id="addObservasiRowBtn" class="btn">Tambah Elemen</button>
+        <button id="clearObservasiDraftBtn" class="btn ghost">Bersihkan Draft</button>
+      </div>
+
+      <div class="table-wrapper obs-entry-table-wrap">
+        <table class="obs-detail-table">
+          <thead>
+            <tr>
+              <th rowspan="2" class="obs-col-no">NO</th>
+              <th rowspan="2" class="obs-col-elemen">Elemen Kerja</th>
+              <th rowspan="2" class="obs-col-kategori obs-divider-right">Kategori</th>
+              <th colspan="10" class="obs-col-sample-group obs-divider-right">Sample</th>
+              <th rowspan="2" class="obs-col-stat">Modus <span class="modus-info">ⓘ</span></th>
+              <th rowspan="2" class="obs-col-stat">Min</th>
+              <th rowspan="2" class="obs-col-stat obs-divider-right">Max</th>
+              <th colspan="2" class="obs-col-qty-group obs-divider-right">Qty</th>
+              <th rowspan="2" class="obs-col-ct obs-divider-right">CT<br>(sec/batt)</th>
+              <th rowspan="2" class="obs-col-note">NOTE</th>
+            </tr>
+            <tr>
+              <th class="obs-col-sample">1</th>
+              <th class="obs-col-sample">2</th>
+              <th class="obs-col-sample">3</th>
+              <th class="obs-col-sample">4</th>
+              <th class="obs-col-sample">5</th>
+              <th class="obs-col-sample">6</th>
+              <th class="obs-col-sample">7</th>
+              <th class="obs-col-sample">8</th>
+              <th class="obs-col-sample">9</th>
+              <th class="obs-col-sample obs-divider-right">10</th>
+              <th class="obs-col-qty">Qty</th>
+              <th class="obs-col-unit obs-divider-right">Unit</th>
+            </tr>
+          </thead>
+          <tbody id="observasiRows"></tbody>
+          <tfoot>
+            <tr id="observasiTotalRow"></tr>
+          </tfoot>
+        </table>
+      </div>
+
+      <div class="summary-block">
+        <p>Total Elemen: <strong id="observasiTotalElemen">0</strong></p>
+        <p>Total CT: <strong id="observasiTotalCycle">0</strong> sec/batt</p>
+      </div>
+
+      <button id="saveObservasiBtn" class="btn primary">Simpan Observasi</button>
+    </section>
+  </template>
+
+  <!-- ══════════════════ VIEW: Data Observasi ══════════════════ -->
+  <template id="tpl-data-observasi">
+    <header class="page-header do-page-header">
+      <div>
+        <h2>Data Observasi</h2>
+        <p>Pilih Line → Type Produk → Proses untuk membuka lembar observasi, lalu print, export, atau buat revisi.</p>
+      </div>
+      <div class="obs-action-group" style="flex-shrink:0;">
+        <button id="dataExportBtn" class="btn">Export Data</button>
+        <label class="btn file-btn" for="dataImportInput">
+          Import Data
+          <input id="dataImportInput" type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
+        </label>
+      </div>
+    </header>
+
+
+    <nav id="doBreadcrumb" class="do-breadcrumb no-print" aria-label="Navigasi Data Observasi"></nav>
+
+    <!-- Daftar bertingkat: Line → Type Produk → Proses (isi tabel diganti per tingkat) -->
+    <section class="card" id="doBrowseSection">
+      <div class="card-header">
+        <div>
+          <h3 id="doBrowseTitle">Data Observasi Tersimpan</h3>
+          <p id="doBrowseHint" class="helper-text do-browse-hint"></p>
+        </div>
+        <div class="obs-action-group">
+          <button type="button" id="doBackBtn" class="btn ghost hidden">&larr; Kembali</button>
+          <a href="#observasi" class="btn ghost">Input Observasi Baru</a>
+          <button id="generateDummyObservasiBtn" class="btn do-top-only">Generate Dummy 7 Line</button>
+          <button id="clearAllDataBtn" class="btn danger do-top-only">Hapus Semua Data</button>
+        </div>
+      </div>
+      <div class="table-wrapper">
+        <table class="do-browse-table">
+          <thead id="doBrowseHead"></thead>
+          <tbody id="doBrowseBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="card hidden" id="savedDetailSection">
+      <div class="card-header">
+        <h3 id="savedDetailTitle">Detail Observasi</h3>
+        <div class="obs-action-group no-print">
+          <button type="button" id="detailBackBtn" class="btn ghost">&larr; Kembali</button>
+          <button id="detailCreateRevisionBtn" class="btn primary">Buat Revisi</button>
+          <button id="detailPrintBtn" class="btn">Print (A4 / PDF)</button>
+          <button id="detailExportXlsxBtn" class="btn">Export Excel (.xlsx)</button>
+        </div>
+      </div>
+
+      <div class="obs-revision-summary">
+        <div class="obs-revision-summary-item">
+          <span>Revisi</span>
+          <strong id="detailRevisionLabel">-</strong>
+        </div>
+        <div class="obs-revision-summary-item">
+          <span>Status</span>
+          <strong id="detailRevisionStatus">-</strong>
+        </div>
+        <div class="obs-revision-summary-item obs-revision-summary-note">
+          <span>Catatan Revisi</span>
+          <strong id="detailRevisionNote">-</strong>
+        </div>
+      </div>
+
+      <div id="observasiDetailPrintArea" class="obs-print-area">
+        <div class="obs-sheet-wrapper obs-sheet-readonly">
+          <table class="obs-sheet-table">
+            <tbody>
+              <tr>
+                <td class="obs-logo-cell" rowspan="4">
+                  <img src="sw/CBI_Logo_large1.png" alt="Logo CBI" class="obs-logo-image">
+                  <div class="obs-logo-name">PT. Century Batteries Indonesia</div>
+                </td>
+
+                <td class="obs-title-cell" colspan="2" rowspan="3">LEMBAR OBSERVASI</td>
+
+                <td class="obs-field-label">LINE</td>
+                <td class="obs-field-input">
+                  <span id="detailLine" class="obs-field-static">-</span>
+                </td>
+
+                <td class="obs-field-label">TANGGAL</td>
+                <td class="obs-field-input">
+                  <span id="detailTanggal" class="obs-field-static">-</span>
+                </td>
+              </tr>
+
+              <tr>
+                <td class="obs-field-label">PROSES</td>
+                <td class="obs-field-input">
+                  <span id="detailProses" class="obs-field-static">-</span>
+                </td>
+
+                <td class="obs-field-label">SHIFT / JAM</td>
+                <td class="obs-field-input">
+                  <span id="detailShift" class="obs-field-static">-</span>
+                </td>
+              </tr>
+
+              <tr>
+                <td class="obs-field-label">TIPE PRODUK</td>
+                <td class="obs-field-input">
+                  <span id="detailProduct" class="obs-field-static">-</span>
+                </td>
+
+                <td class="obs-field-label">NAMA OBSERVER</td>
+                <td class="obs-field-input">
+                  <span id="detailObserver" class="obs-field-static">-</span>
+                </td>
+              </tr>
+
+              <tr>
+                <td class="obs-field-label">NO FORM</td>
+                <td class="obs-fixed-cell">
+                  <span id="detailNoForm" class="obs-fixed-value">Form-ISD-ISD-001</span>
+                </td>
+
+                <td class="obs-field-label">TAKT TIME</td>
+                <td class="obs-field-input">
+                  <span id="detailTakt" class="obs-field-static">-</span>
+                </td>
+
+                <td class="obs-field-label">NAMA OPERATOR</td>
+                <td class="obs-field-input">
+                  <span id="detailOperator" class="obs-field-static">-</span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="table-wrapper obs-print-table-wrap">
+          <table class="obs-detail-table">
+            <thead>
+              <tr>
+                <th rowspan="2" class="obs-col-no">NO</th>
+                <th rowspan="2" class="obs-col-elemen">Elemen Kerja</th>
+                <th rowspan="2" class="obs-col-kategori obs-divider-right">Kategori</th>
+                <th colspan="10" class="obs-col-sample-group obs-divider-right">Sample</th>
+                <th rowspan="2" class="obs-col-stat">Modus <span class="modus-info">ⓘ</span></th>
+                <th rowspan="2" class="obs-col-stat">Min</th>
+                <th rowspan="2" class="obs-col-stat obs-divider-right">Max</th>
+                <th colspan="2" class="obs-col-qty-group obs-divider-right">Qty</th>
+                <th rowspan="2" class="obs-col-ct obs-divider-right">CT<br>(sec/batt)</th>
+                <th rowspan="2" class="obs-col-note">NOTE</th>
+              </tr>
+              <tr>
+                <th class="obs-col-sample">1</th>
+                <th class="obs-col-sample">2</th>
+                <th class="obs-col-sample">3</th>
+                <th class="obs-col-sample">4</th>
+                <th class="obs-col-sample">5</th>
+                <th class="obs-col-sample">6</th>
+                <th class="obs-col-sample">7</th>
+                <th class="obs-col-sample">8</th>
+                <th class="obs-col-sample">9</th>
+                <th class="obs-col-sample obs-divider-right">10</th>
+                <th class="obs-col-qty">Qty</th>
+                <th class="obs-col-unit obs-divider-right">Unit</th>
+              </tr>
+            </thead>
+            <tbody id="savedDetailRows">
+              <tr>
+                <td colspan="20" class="placeholder">Pilih tombol Detail pada data tersimpan.</td>
+              </tr>
+            </tbody>
+            <tfoot>
+              <tr id="savedDetailTotalRow"></tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+
+      <div class="obs-revision-history">
+        <h4>Riwayat Revisi</h4>
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>Revisi</th>
+                <th>Tanggal / Jam</th>
+                <th>Status</th>
+                <th>Observer</th>
+                <th>Catatan Revisi</th>
+                <th>Aksi</th>
+              </tr>
+            </thead>
+            <tbody id="revisionHistoryBody">
+              <tr>
+                <td colspan="6" class="placeholder">Pilih detail observasi untuk melihat riwayat revisi.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  </template>
+
+  <!-- ══════════════════ VIEW: TSKK ══════════════════ -->
+  <template id="tpl-tskk">
+    <header class="page-header">
+      <h2>Tabel Standar Kerja Kombinasi (TSKK)</h2>
+    </header>
+
+
+    <!-- Controls -->
+    <div class="tskk-controls card" style="padding:12px 16px;">
+      <label>
+        Line
+        <select id="tskkLineSelect"></select>
+      </label>
+      <label>
+        Type Produk
+        <select id="tskkProductSelect"></select>
+      </label>
+      <label>
+        Proses
+        <select id="tskkObsSelect"></select>
+      </label>
+      <button id="tskkGenerateBtn" class="btn primary">Generate TSKK</button>
+      <button id="tskkPrintBtn" class="btn">Print</button>
+      <button id="tskkExportBtn" class="btn">Export Excel (.xlsx)</button>
+    </div>
+
+    <!-- ══ TSKK Printable Form ══ -->
+    <div id="tskkForm" class="tskk-form">
+
+      <!-- Header — 11 kolom: Logo|TitleL|TitleR|LblKanan|CTsym|CTval|TargetLbl|TargetVal|Diketh|Diper|Dibuat -->
+      <table class="tskk-hdr">
+        <tbody>
+          <!-- Row 1 -->
+          <tr>
+            <td rowspan="6" class="hdr-logo">
+              <img src="sw/CBI_Logo_large1.png" alt="Logo CBI" class="tskk-logo-img">
+              <div class="tskk-logo-name">PT. Century Batteries Indonesia</div>
+            </td>
+            <td colspan="2" rowspan="3" class="hdr-title">TABEL STANDAR KERJA KOMBINASI</td>
+            <td class="hdr-lbl">Line</td>
+            <td colspan="2" id="tskkHdrLine">-</td>
+            <td class="hdr-lbl-sm">Target Produksi Per Shift</td>
+            <td id="tskkHdrTarget" style="font-weight:700; text-align:center;">-</td>
+            <td rowspan="6" class="hdr-approval">Diketahui</td>
+            <td rowspan="6" class="hdr-approval">Diperiksa</td>
+            <td rowspan="6" class="hdr-approval">Dibuat</td>
+          </tr>
+          <!-- Row 2 -->
+          <tr>
+            <td class="hdr-lbl">Proses</td>
+            <td colspan="2" id="tskkHdrProsesSmall">-</td>
+            <td colspan="2" rowspan="2" class="hdr-proses-big" id="tskkHdrProses">-</td>
+          </tr>
+          <!-- Row 3 -->
+          <tr>
+            <td class="hdr-lbl">Model/Tipe</td>
+            <td colspan="2" id="tskkHdrModel">-</td>
+          </tr>
+          <!-- Row 4 -->
+          <tr>
+            <td class="hdr-lbl">No Document</td>
+            <td>Form-ISD-ISD-002</td>
+            <td class="hdr-lbl">Cycle Time</td>
+            <td class="hdr-ct-sym"></td>
+            <td id="tskkHdrCt" style="font-weight:700; text-align:center;">-</td>
+            <td colspan="2" rowspan="2"></td>
+          </tr>
+          <!-- Row 5 -->
+          <tr>
+            <td class="hdr-lbl">Revisi</td>
+            <td style="text-align:center;">0</td>
+            <td class="hdr-lbl">Takt Time</td>
+            <td class="hdr-tt-sym"></td>
+            <td id="tskkHdrTt" style="font-weight:700; text-align:center;">-</td>
+          </tr>
+          <!-- Row 6 — Tanggal + Legend -->
+          <tr>
+            <td class="hdr-lbl">Tanggal</td>
+            <td id="tskkHdrTanggal" style="text-align:center;">-</td>
+            <td colspan="2" class="hdr-legend">
+              <span class="hleg-label">Manual :</span><span class="hleg-manual"></span>
+            </td>
+            <td colspan="2" class="hdr-legend">
+              <span class="hleg-label">Auto :</span><span class="hleg-auto"></span>
+            </td>
+            <td class="hdr-legend">
+              <span class="hleg-label">Walking :</span><span class="hleg-walk"></span>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      <!-- Main table + timing chart -->
+      <div class="tskk-body-wrap">
+        <table class="tskk-data-table" id="tskkDataTable">
+          <colgroup>
+            <col class="col-no">
+            <col class="col-uraian">
+            <col class="col-waktu">
+            <col class="col-waktu">
+            <col class="col-waktu">
+          </colgroup>
+          <thead>
+            <tr>
+              <th rowspan="2">No</th>
+              <th rowspan="2">Uraian Pekerjaan</th>
+              <th colspan="3">Waktu</th>
+            </tr>
+            <tr>
+              <th>Manual</th>
+              <th>Auto</th>
+              <th>Walking</th>
+            </tr>
+          </thead>
+          <tbody id="tskkRows">
+            <!-- 20 rows rendered by JS -->
+          </tbody>
+          <tfoot>
+            <tr>
+              <td colspan="2">Total</td>
+              <td id="tskkTotalManual">0</td>
+              <td id="tskkTotalAuto">0</td>
+              <td id="tskkTotalWalking">0</td>
+            </tr>
+          </tfoot>
+        </table>
+
+        <div class="tskk-chart-wrap" id="tskkChartWrap">
+          <canvas id="tskkChartCanvas"></canvas>
+        </div>
+      </div>
+
+    </div><!-- /tskk-form -->
+  </template>
+
+  <!-- ══════════════════ VIEW: TSK ══════════════════ -->
+  <template id="tpl-tsk">
+    <header class="page-header">
+      <h2>Tabel Standar Kerja (TSK)</h2>
+      <p>Satu lembar per proses: layout area kerja, urutan pekerjaan, dan waktu tiap pekerjaan (Form-ISD-ISD-003).</p>
+    </header>
+
+    <section class="card tsk-controls no-print">
+      <div class="form-inline">
+        <label>
+          Line
+          <select id="tskLineSelect"></select>
+        </label>
+        <label>
+          Type Produk
+          <select id="tskProductSelect"></select>
+        </label>
+        <label>
+          Proses
+          <select id="tskProcessSelect"></select>
+        </label>
+        <button type="button" id="tskPrintBtn" class="btn">Print</button>
+      </div>
+      <div class="tsk-tools">
+        <span class="tsk-tools-label">Layout</span>
+        <button type="button" class="btn ghost" data-tsk-add="box">+ Mesin / Area</button>
+        <button type="button" class="btn ghost" data-tsk-add="qc">+ Quality Check</button>
+        <button type="button" class="btn ghost" data-tsk-add="safety">+ Safety</button>
+        <button type="button" class="btn ghost" data-tsk-add="wip">+ WIP</button>
+        <button type="button" id="tskDeleteBtn" class="btn danger" disabled>Hapus yang dipilih</button>
+        <button type="button" id="tskResetBtn" class="btn ghost">Atur Ulang Layout</button>
+      </div>
+      <p class="helper-text">Lingkaran bernomor = nomor pekerjaan di tabel (pekerjaan jalan digambar sebagai panah). Geser kotak mesin, lingkaran, simbol, dan operator untuk mengatur layout. Klik dua kali kotak untuk mengganti nama, tarik sudut kanan-bawah kotak terpilih untuk mengubah ukuran. Perubahan tersimpan otomatis.</p>
+    </section>
+
+    <!-- ══ Form TSK (Form-ISD-ISD-003) ══ -->
+    <div id="tskForm" class="tsk-form">
+      <!-- Definisi simbol bersama: dipakai layout & footer -->
+      <svg class="tsk-defs" width="0" height="0" aria-hidden="true" focusable="false">
+        <defs>
+          <pattern id="tskHatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+            <rect width="6" height="6" fill="#fff"/>
+            <line x1="0" y1="0" x2="0" y2="6" stroke="#111" stroke-width="1.6"/>
+          </pattern>
+          <pattern id="tskGrid" width="30" height="30" patternUnits="userSpaceOnUse">
+            <path d="M30 0H0V30" fill="none" stroke="#b9bec6" stroke-width="0.8" stroke-dasharray="2 2"/>
+          </pattern>
+          <marker id="tskArrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto" markerUnits="strokeWidth">
+            <path d="M0,1 L9,5 L0,9 z" fill="#111"/>
+          </marker>
+          <symbol id="tsk-sym-qc" viewBox="-50 -50 100 100">
+            <path d="M0,-46 L46,0 L0,46 L-46,0 Z" fill="#fff" stroke="#111" stroke-width="3"/>
+          </symbol>
+          <symbol id="tsk-sym-safety" viewBox="-50 -50 100 100">
+            <path d="M-14,-46 H14 V-34 H22 V-22 H34 V-14 H46 V14 H34 V22 H22 V34 H14 V46 H-14 V34 H-22 V22 H-34 V14 H-46 V-14 H-34 V-22 H-22 V-34 H-14 Z" fill="url(#tskHatch)" stroke="#111" stroke-width="3"/>
+          </symbol>
+          <symbol id="tsk-sym-wip" viewBox="-50 -50 100 100">
+            <circle r="45" fill="url(#tskHatch)" stroke="#111" stroke-width="3"/>
+          </symbol>
+        </defs>
+      </svg>
+
+      <!-- Header: Logo | Judul + Document No + Revisi | Nama Proses | Persetujuan -->
+      <table class="tsk-hdr">
+        <colgroup>
+          <col style="width:10%"><col style="width:12%"><col style="width:28%"><col style="width:26%">
+          <col style="width:8%"><col style="width:8%"><col style="width:8%">
+        </colgroup>
+        <tbody>
+          <tr>
+            <td rowspan="4" class="tsk-hdr-logo">
+              <img src="sw/CBI_Logo_large1.png" alt="Logo CBI" class="tsk-logo-img">
+              <div class="tsk-logo-name">PT. Century Batteries Indonesia</div>
+            </td>
+            <td colspan="2" rowspan="2" class="tsk-hdr-title">TABEL STANDAR KERJA</td>
+            <td rowspan="4" class="tsk-hdr-nama">
+              <span class="tsk-hdr-nama-lbl">NAMA PROSES :</span>
+              <span id="tskHdrNama" class="tsk-hdr-nama-val">-</span>
+            </td>
+            <td class="tsk-hdr-appr">DISETUJUI</td>
+            <td class="tsk-hdr-appr">DIPERIKSA</td>
+            <td class="tsk-hdr-appr">DIBUAT</td>
+          </tr>
+          <tr>
+            <td rowspan="2" class="tsk-hdr-sign"></td>
+            <td rowspan="2" class="tsk-hdr-sign"></td>
+            <td rowspan="2" class="tsk-hdr-sign"></td>
+          </tr>
+          <tr>
+            <td class="tsk-hdr-lbl">DOCUMENT NO</td>
+            <td class="tsk-hdr-val">Form-ISD-ISD-003</td>
+          </tr>
+          <tr>
+            <td class="tsk-hdr-lbl">REVISI</td>
+            <td class="tsk-hdr-val"><input id="tskRevisi" class="tsk-input" type="text" maxlength="10" aria-label="Revisi"></td>
+            <td class="tsk-hdr-date"></td>
+            <td class="tsk-hdr-date"></td>
+            <td class="tsk-hdr-date"></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <!-- Body: layout (kiri) + tabel pekerjaan (kanan) -->
+      <div class="tsk-body">
+        <div class="tsk-layout" id="tskLayout">
+          <div class="tsk-fromto">
+            <label class="tsk-fromto-box"><span>DARI</span><span>:</span><input id="tskDari" class="tsk-input" type="text" maxlength="80"></label>
+            <label class="tsk-fromto-box"><span>KE</span><span>:</span><input id="tskKe" class="tsk-input" type="text" maxlength="80"></label>
+          </div>
+          <svg id="tskLayoutSvg" class="tsk-layout-svg" viewBox="0 0 930 600" role="img" aria-label="Layout area kerja"></svg>
+        </div>
+
+        <table class="tsk-data">
+          <colgroup><col class="tsk-col-no"><col><col class="tsk-col-w"><col class="tsk-col-w"><col class="tsk-col-w"></colgroup>
+          <thead>
+            <tr>
+              <th rowspan="2">NO</th>
+              <th rowspan="2">PEKERJAAN</th>
+              <th colspan="3">WAKTU</th>
+            </tr>
+            <tr>
+              <th class="tsk-th-sm">MAN</th>
+              <th class="tsk-th-sm">AUTO</th>
+              <th class="tsk-th-sm">JALAN</th>
+            </tr>
+          </thead>
+          <tbody id="tskRows"></tbody>
+          <tfoot>
+            <tr>
+              <td colspan="2" class="tsk-total-lbl">TOTAL</td>
+              <td id="tskTotalMan"></td>
+              <td id="tskTotalAuto"></td>
+              <td id="tskTotalJalan"></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+
+      <!-- Footer: identitas + simbol + Takt/Cycle Time/MP -->
+      <div class="tsk-foot">
+        <table class="tsk-foot-info">
+          <tbody>
+            <tr><td class="tsk-foot-lbl">LINE</td><td id="tskFootLine">-</td></tr>
+            <tr><td class="tsk-foot-lbl">PROSES</td><td id="tskFootProses">-</td></tr>
+            <tr><td class="tsk-foot-lbl">TIPE</td><td id="tskFootTipe">-</td></tr>
+            <tr><td class="tsk-foot-lbl">TANGGAL</td><td id="tskFootTanggal">-</td></tr>
+          </tbody>
+        </table>
+
+        <table class="tsk-foot-std">
+          <tbody>
+            <tr>
+              <td class="tsk-foot-head">QUALITY CHECK</td>
+              <td class="tsk-foot-head">SAFETY</td>
+              <td class="tsk-foot-head" colspan="2">WORK IN PROCESS</td>
+              <td class="tsk-foot-head">TAKT TIME</td>
+              <td class="tsk-foot-head">CYCLE TIME</td>
+              <td class="tsk-foot-head">MP</td>
+            </tr>
+            <tr>
+              <td rowspan="2" class="tsk-foot-sym"><svg viewBox="0 0 100 100"><use href="#tsk-sym-qc" width="100" height="100"/></svg></td>
+              <td rowspan="2" class="tsk-foot-sym"><svg viewBox="0 0 100 100"><use href="#tsk-sym-safety" width="100" height="100"/></svg></td>
+              <td rowspan="2" class="tsk-foot-sym"><svg viewBox="0 0 100 100"><use href="#tsk-sym-wip" width="100" height="100"/></svg></td>
+              <td class="tsk-foot-wiplbl">JUMLAH WIP</td>
+              <td rowspan="2" id="tskTakt" class="tsk-foot-num">-</td>
+              <td rowspan="2" id="tskCycle" class="tsk-foot-num">-</td>
+              <td rowspan="2" id="tskMp" class="tsk-foot-num">-</td>
+            </tr>
+            <tr>
+              <td class="tsk-foot-wipval"><input id="tskWip" class="tsk-input" type="text" maxlength="10" aria-label="Jumlah WIP"></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="tsk-formcode">
+        <span>Revisi : 0</span>
+        <span>Form-ISD-ISD-003 (Tabel Standar Kerja)</span>
+      </div>
+    </div>
+  </template>
+
+  <!-- ══════════════════ VIEW: TSKP ══════════════════ -->
+  <template id="tpl-tskp">
+    <header class="page-header">
+      <h2>Tabel Standar Kapasitas Produksi (TSKP)</h2>
+      <p>Satu lembar per line &amp; type produk: kapasitas tiap proses per shift dan bottleneck-nya (Form-ISD-ISD-005).</p>
+    </header>
+
+    <section class="card tskp-controls no-print">
+      <div class="form-inline">
+        <label>
+          Line
+          <select id="tskpLineSelect"></select>
+        </label>
+        <label>
+          Type Produk
+          <select id="tskpProductSelect"></select>
+        </label>
+        <button type="button" id="tskpPrintBtn" class="btn">Print</button>
+        <button type="button" id="tskpExportBtn" class="btn ghost">Export Excel (.xlsx)</button>
+      </div>
+      <p id="tskpSummary" class="tskp-summary"></p>
+      <p class="helper-text">Manual = waktu kerja operator (termasuk jalan), Auto = waktu mesin, Time To Complete = Manual + Auto (detik). Kapasitas/shift = waktu kerja per shift ÷ (Time To Complete + Time Taken ÷ No Changed). M/C Number, Tools, waktu kerja per shift, dan revisi diisi langsung di form dan tersimpan otomatis.</p>
+    </section>
+
+    <!-- ══ Form TSKP (Form-ISD-ISD-005) ══ -->
+    <div id="tskpForm" class="tsk-form tskp-form">
+      <table class="tsk-hdr tskp-hdr">
+        <colgroup>
+          <col style="width:9%"><col style="width:18%"><col style="width:21%"><col style="width:9%"><col style="width:15%">
+          <col style="width:9.33%"><col style="width:9.33%"><col style="width:9.34%">
+        </colgroup>
+        <tbody>
+          <tr>
+            <td rowspan="4" class="tsk-hdr-logo">
+              <img src="sw/CBI_Logo_large1.png" alt="Logo CBI" class="tsk-logo-img">
+              <div class="tsk-logo-name">PT. Century Batteries Indonesia</div>
+            </td>
+            <td colspan="2" rowspan="3" class="tsk-hdr-title">TABEL STANDAR KAPASITAS PRODUKSI</td>
+            <td class="tsk-hdr-lbl">LINE</td>
+            <td id="tskpHdrLine" class="tskp-hdr-val"></td>
+            <td class="tsk-hdr-appr">DISETUJUI</td>
+            <td class="tsk-hdr-appr">DIPERIKSA</td>
+            <td class="tsk-hdr-appr">DIBUAT</td>
+          </tr>
+          <tr>
+            <td class="tsk-hdr-lbl">NAMA PRODUK</td>
+            <td id="tskpHdrProduk" class="tskp-hdr-val"></td>
+            <td rowspan="2" class="tsk-hdr-sign"></td>
+            <td rowspan="2" class="tsk-hdr-sign"></td>
+            <td rowspan="2" class="tsk-hdr-sign"></td>
+          </tr>
+          <tr>
+            <td class="tsk-hdr-lbl">TANGGAL</td>
+            <td id="tskpHdrTanggal" class="tskp-hdr-val"></td>
+          </tr>
+          <tr>
+            <td class="tsk-hdr-lbl">NO DOKUMEN</td>
+            <td class="tsk-hdr-val">Form-ISD-ISD-005</td>
+            <td class="tsk-hdr-lbl">REVISI</td>
+            <td class="tskp-hdr-val"><input id="tskpRevisi" class="tsk-input" type="text" maxlength="10" aria-label="Revisi"></td>
+            <td class="tsk-hdr-date"></td>
+            <td class="tsk-hdr-date"></td>
+            <td class="tsk-hdr-date"></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <table class="tskp-data">
+        <colgroup>
+          <col style="width:3%"><col style="width:24%"><col style="width:6%">
+          <col style="width:6%"><col style="width:6%"><col style="width:6%">
+          <col style="width:6%"><col style="width:6%"><col style="width:9%"><col style="width:28%">
+        </colgroup>
+        <thead>
+          <tr>
+            <th rowspan="2">NO</th>
+            <th rowspan="2">OPERATION</th>
+            <th rowspan="2">M/C<br>NUMBER</th>
+            <th colspan="3">BASIC TIME</th>
+            <th colspan="2">TOOLS</th>
+            <th rowspan="2" class="tskp-th-cap">PROCESSING<br>CAPACITY/SHIFT<br>(<input id="tskpShiftMin" class="tsk-input tskp-shift-input" type="number" min="1" step="1" aria-label="Waktu kerja per shift (menit)"> mnt)</th>
+            <th rowspan="2" class="tskp-chart-head">
+              <div class="tskp-legend">
+                <span><i class="tskp-key-man"></i>= Manual</span>
+                <span><i class="tskp-key-auto"></i>= Auto</span>
+                <span id="tskpLegendTakt" hidden><i class="tskp-key-takt"></i>= Takt Time</span>
+              </div>
+              <div id="tskpAxis" class="tskp-axis"></div>
+            </th>
+          </tr>
+          <tr>
+            <th>Manual</th>
+            <th>Auto</th>
+            <th class="tskp-th-sm">Time To<br>Complete</th>
+            <th class="tskp-th-sm">NO<br>CHANGED</th>
+            <th class="tskp-th-sm">TIME TAKEN</th>
+          </tr>
+        </thead>
+        <tbody id="tskpRows"></tbody>
+        <tfoot>
+          <tr>
+            <td colspan="2"></td>
+            <td class="tskp-total-lbl">TOTAL</td>
+            <td id="tskpTotalManual" class="tskp-total-val"></td>
+            <td colspan="6"></td>
+          </tr>
+        </tfoot>
+      </table>
+
+      <div class="tsk-formcode tskp-formcode">
+        <span>Revisi : 0</span>
+        <span><em>Form-ISD-ISD-005 (Tabel Standar Kapasitas Produksi)</em></span>
+      </div>
+    </div>
+  </template>
+
+  <!-- ══════════════════ VIEW: Yamazumi ══════════════════ -->
+  <template id="tpl-yamazumi">
+    <header class="page-header">
+      <h2>Yamazumi Chart</h2>
+      <p>Bandingkan beban kerja antar operator atau proses dengan garis takt time.</p>
+    </header>
+
+
+    <section class="card no-print">
+      <div class="form-inline">
+        <label>
+          Mode
+          <select id="yamazumiModeSelect">
+            <option value="all">All</option>
+            <option value="manpower">Man Power</option>
+            <option value="machine">Machine</option>
+          </select>
+        </label>
+
+        <label>
+          Line
+          <select id="yamazumiLineSelect"></select>
+        </label>
+
+        <label>
+          Type Produk
+          <select id="yamazumiProductSelect"></select>
+        </label>
+
+        <button id="refreshYamazumiBtn" class="btn primary">Refresh Chart</button>
+        <button id="exportYamazumiXlsxBtn" class="btn">Export Excel (.xlsx)</button>
+        <button id="downloadYamazumiPdfBtn" class="btn">Download PDF</button>
+        <button id="editYamazumiBtn" class="btn ghost">Edit Yamazumi (Line Balancing)</button>
+      </div>
+    </section>
+
+    <div id="yamazumiPrintArea" class="yamazumi-print-area">
+      <section class="card">
+        <div class="yamazumi-meta">
+          <div class="yamazumi-meta-item">
+            <span class="yamazumi-meta-label">Line</span>
+            <strong id="yamazumiMetaLine">-</strong>
+          </div>
+          <div class="yamazumi-meta-item">
+            <span class="yamazumi-meta-label">Mode</span>
+            <strong id="yamazumiMetaMode">-</strong>
+          </div>
+          <div class="yamazumi-meta-item">
+            <span class="yamazumi-meta-label">Type Produk</span>
+            <strong id="yamazumiMetaProduct">-</strong>
+          </div>
+          <div class="yamazumi-meta-item">
+            <span class="yamazumi-meta-label">Takt Time</span>
+            <strong id="yamazumiMetaTakt">-</strong>
+          </div>
+          <div class="yamazumi-meta-item">
+            <span class="yamazumi-meta-label">Cycle Time</span>
+            <strong id="yamazumiMetaCycle">-</strong>
+          </div>
+          <div class="yamazumi-meta-item">
+            <span class="yamazumi-meta-label">Jumlah Proses</span>
+            <strong id="yamazumiMetaCount">0</strong>
+          </div>
+        </div>
+      </section>
+
+      <section class="card" id="yamazumiManpowerSection">
+        <h3>Yamazumi Man Power</h3>
+        <canvas id="yamazumiManpowerChart" class="chart-canvas" height="380"></canvas>
+      </section>
+
+      <section class="card" id="yamazumiMachineSection">
+        <h3>Yamazumi Mesin / Proses</h3>
+        <canvas id="yamazumiMachineChart" class="chart-canvas" height="380"></canvas>
+      </section>
+
+      <section class="card" id="yamazumiDetailSection">
+        <div class="card-header yamazumi-detail-header">
+          <h3>Detail Beban Kerja</h3>
+          <button type="button" id="yamazumiDetailToggle" class="btn ghost no-print" aria-expanded="true" aria-controls="yamazumiDetailBody">Sembunyikan</button>
+        </div>
+        <div class="table-wrapper" id="yamazumiDetailBody">
+          <table>
+            <thead>
+              <tr>
+                <th>Proses</th>
+                <th>Jenis</th>
+                <th>Beban Kerja (detik)</th>
+                <th>Status terhadap Takt</th>
+              </tr>
+            </thead>
+            <tbody id="yamazumiBody">
+              <tr>
+                <td colspan="4" class="placeholder">Belum ada data observasi.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+  </template>
+
+  <!-- ══════════════════ VIEW: Edit Yamazumi (Line Balancing) ══════════════════ -->
+  <template id="tpl-yamazumi-edit">
+    <header class="page-header yze-page-header">
+      <div>
+        <h2>Edit Yamazumi — Line Balancing</h2>
+        <p>Seret elemen kerja ke man power atau proses lain untuk simulasi balancing. Data observasi asli tidak ikut berubah.</p>
+      </div>
+      <div class="obs-action-group">
+        <a href="#yamazumi" class="btn ghost">Kembali ke Yamazumi</a>
+        <button id="yzeExportBtn" class="btn">Export Excel (.xlsx)</button>
+        <button id="yzeResetBtn" class="btn">Reset dari Observasi</button>
+      </div>
+    </header>
+
+
+    <section class="card yze-toolbar">
+      <label>
+        Line
+        <select id="yzeLineSelect"></select>
+      </label>
+      <label>
+        Type Produk
+        <select id="yzeProductSelect"></select>
+      </label>
+      <label>
+        Takt Time (detik)
+        <input id="yzeTaktInput" type="number" min="0.1" step="0.1">
+      </label>
+      <label>
+        Garis Cycle Time
+        <select id="yzeCtLineSelect">
+          <option value="bottleneck">Bottleneck</option>
+          <option value="average">Rata-rata</option>
+          <option value="off">Sembunyikan</option>
+        </select>
+      </label>
+      <div class="yze-tabs" role="group" aria-label="Pilih chart">
+        <button type="button" class="yze-tab" data-board="manpower">Man Power</button>
+        <button type="button" class="yze-tab" data-board="machine">Mesin / Proses</button>
+      </div>
+      <span id="yzeSaveStatus" class="yze-save-status"></span>
+    </section>
+
+    <div id="yzeKpis" class="yze-kpis"></div>
+
+    <div class="yze-layout">
+      <section class="card yze-stage">
+        <div class="yze-stage-head">
+          <h3 id="yzeBoardTitle">Beban kerja per Man Power</h3>
+          <span class="helper-text">Seret blok ke kolom lain (atau ke atas/bawah blok lain) untuk memindahkan elemen kerja. Klik blok untuk mengubah isinya.</span>
+        </div>
+        <div class="yze-chart" id="yzeChart">
+          <div class="yze-axis">
+            <div class="yze-ruler" id="yzeRuler"></div>
+            <div class="yze-axis-unit">detik</div>
+          </div>
+          <div class="yze-plot-wrap">
+            <div class="yze-canvas" id="yzeCanvas">
+              <div class="yze-overlay" id="yzeOverlay"></div>
+              <div class="yze-cols" id="yzeCols"></div>
+            </div>
+          </div>
+        </div>
+        <p id="yzeEmpty" class="placeholder hidden"></p>
+      </section>
+
+      <aside class="yze-side">
+        <section class="card">
+          <h3 id="yzeFormTitle">Tambah elemen kerja</h3>
+          <form id="yzeForm" class="yze-form" novalidate>
+            <label>
+              Kolom (Man Power / Proses)
+              <select id="yzeFormColumn"></select>
+            </label>
+            <label>
+              Nama elemen kerja
+              <input id="yzeFormName" type="text" maxlength="80" autocomplete="off">
+            </label>
+            <div class="yze-row2">
+              <label>
+                Durasi (detik)
+                <input id="yzeFormDuration" type="number" min="0.01" step="0.01">
+              </label>
+              <label>
+                Kategori
+                <select id="yzeFormCategory"></select>
+              </label>
+            </div>
+            <label>
+              Catatan
+              <input id="yzeFormNote" type="text" maxlength="160" autocomplete="off">
+            </label>
+            <p id="yzeFormOrigin" class="yze-form-origin"></p>
+            <div class="yze-btn-row">
+              <button type="submit" id="yzeFormSubmit" class="btn primary">Tambah elemen</button>
+              <button type="button" id="yzeFormCancel" class="btn ghost hidden">Batal</button>
+              <button type="button" id="yzeFormDelete" class="btn danger hidden">Hapus</button>
+            </div>
+          </form>
+        </section>
+
+        <section class="card">
+          <div class="card-header">
+            <h3 id="yzeColumnsTitle">Man Power</h3>
+            <button type="button" id="yzeAddColumnBtn" class="btn ghost">Tambah</button>
+          </div>
+          <div id="yzeColumnList" class="yze-col-list"></div>
+        </section>
+
+        <section class="card">
+          <h3>Komposisi Waktu</h3>
+          <div id="yzeMix" class="yze-mix"></div>
+          <div id="yzeLegend" class="yze-legend"></div>
+        </section>
+      </aside>
+    </div>
+
+    <div id="yzeTip" class="yze-tip" aria-hidden="true"></div>
+  </template>
+
+  <script src="shared-components.js"></script>
+  <script src="sw/storage.js"></script>
+  <script src="sw/chart.js"></script>
+  <script src="sw/app.js"></script>
+</body>
+</html>

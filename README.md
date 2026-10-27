@@ -30,11 +30,14 @@ bpms/
 ├── database-konversi.html  # Data Plate Infor, PuLe, Type Plate, Rate
 ├── setting-capacity.html   # Workday & Shift + Process Capacity
 ├── man-power.html          # Konfigurasi Man Power per kelompok
+├── standardized-work.html  # Modul Standardized Work (view per hash: #observasi, #tskk, ...)
 ├── shared-components.js    # Singleton BPMS — state, sidebar, utils
 ├── style.css               # Stylesheet global (light theme)
 ├── Logo FAH.png            # Logo portal
+├── sw/                     # Aset Standardized Work: app.js, storage.js, chart.js, sw.css, logo CBI
 └── api/
-    └── state.php           # Backend API (read/write state.json)
+    ├── state.php           # Backend API (read/write state.json)
+    └── sw-state.php        # Backend API Standardized Work (read/write data/sw-state.json)
 ```
 
 ---
@@ -81,6 +84,17 @@ Halaman landing portal dengan logo, brand name, slogan, dan quick-nav ke halaman
 ### Man Power (`man-power.html`)
 - 10 kelompok tabel: Assembling, Wet Battery, Formation, Pasting, Mixing, Ball Mill, Grid Casting, Grid Punching, Wide Strip, Lithium
 - Input MP Shift 1/2/3 per kelompok, total per grup, grand total global
+
+### Standardized Work (`standardized-work.html`)
+Satu halaman dengan view per hash (menu di grup sidebar **Standardized Work**):
+- **Dashboard** (`#home`) — ringkasan proses, operator, rata-rata cycle time, observasi terakhir
+- **Lembar Observasi** (`#observasi`) — input elemen kerja + 10 sample CT, import/form Excel 1 proses / 1 line
+- **Data Observasi** (`#data-observasi`) — Line → Type Produk → Proses, revisi, print, export/import Excel
+- **TSKK** — tabel standar kerja kombinasi
+- **TSKP** (`#tskp`) — Tabel Standar Kapasitas Produksi (Form-ISD-ISD-005) per line & type produk: semua proses dengan waktu Manual/Auto/Time To Complete, tools, kapasitas per shift, grafik manual-auto + garis takt, bottleneck; siap print A4 landscape & export Excel
+- **TSK** (`#tsk`) — Tabel Standar Kerja (Form-ISD-ISD-003) per proses: layout area kerja (kotak mesin, lingkaran bernomor = nomor pekerjaan, alur operator, simbol QC/Safety/WIP), tabel MAN/AUTO/JALAN, takt & cycle time; siap print A4 landscape
+- **Yamazumi** (`#yamazumi`, `#yamazumi-edit`) — chart beban kerja + simulasi line balancing
+- Data terpisah dari state FAH: localStorage `standardized_work_app_v1` + `data/sw-state.json` via `api/sw-state.php`
 
 ---
 

@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Capacity Planning — Factory Analytics Hub</title>
+  <link rel="stylesheet" href="style.css"/>
+  <style>
+    /* ── Tab Navigation ─────────────────────────────────────────── */
+    .cp-tabs { display: flex; gap: 2px; border-bottom: 2px solid var(--border-solid2); margin-bottom: 20px; flex-wrap: wrap; }
+    .cp-tab {
+      padding: 8px 18px; font-size: 13px; font-weight: 500; color: var(--text-3); cursor: pointer;
+      border: none; background: none; border-bottom: 2px solid transparent; margin-bottom: -2px;
+      border-radius: 6px 6px 0 0; transition: color var(--transition), background var(--transition), border-color var(--transition);
+      white-space: nowrap;
+    }
+    .cp-tab:hover  { color: var(--text-1); background: var(--bg-2); }
+    .cp-tab.active { color: var(--accent); border-bottom-color: var(--accent); background: rgba(94,106,210,.06); }
+    .cp-panel { display: none; }
+    .cp-panel.active { display: block; }
+
+    /* ── Section headers ───────────────────────────────────────── */
+    .cp-section-title {
+      font-size: 13px; font-weight: 700; color: var(--text-1); margin: 30px 0 8px;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .cp-section-title:first-child { margin-top: 0; }
+    .cp-section-num {
+      display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px;
+      border-radius: 50%; background: var(--accent); color: #fff; font-size: 11px; font-weight: 700; flex-shrink: 0;
+    }
+    .cp-section-desc { font-size: 11.5px; color: var(--text-4); margin: 0 0 12px 28px; }
+
+    .cp-legend { display: flex; gap: 14px; font-size: 11px; color: var(--text-3); margin: 0 0 10px 28px; flex-wrap: wrap; }
+    .cp-legend span { display: inline-flex; align-items: center; gap: 5px; }
+    .cp-legend i { width: 11px; height: 11px; border-radius: 3px; display: inline-block; border: 1px solid var(--border-solid2); }
+
+    /* ── Monthly tables (Ringkasan & Detail per Line) ──────────── */
+    .cp-table-wrap { overflow-x: auto; border: 1px solid var(--border-solid2); border-radius: 8px; margin-left: 28px; }
+    .cp-table { width: 100%; border-collapse: collapse; font-size: 12px; min-width: 1080px; }
+    .cp-table th, .cp-table td { padding: 6px 8px; border-bottom: 1px solid var(--border); text-align: center; white-space: nowrap; }
+    .cp-table thead th { background: var(--bg-2); font-weight: 700; font-size: 10.5px; color: var(--text-3); position: sticky; top: 0; z-index: 2; }
+    .cp-table td:first-child, .cp-table th:first-child {
+      text-align: left; position: sticky; left: 0; background: var(--bg-1); z-index: 1;
+      min-width: 180px; max-width: 180px; white-space: normal;
+    }
+    .cp-table thead th:first-child { background: var(--bg-2); z-index: 3; }
+    .cp-unit { font-size: 9.5px; color: var(--text-4); font-weight: 400; }
+    .cp-table tr.cp-computed td { background: #f7f8fc; }
+    .cp-table tr.cp-computed td:first-child { background: #f0f1fa; }
+    .cp-table tr.cp-highlight td { background: #eef4ff !important; font-weight: 700; color: #1d4ed8; }
+    .cp-table tr.cp-highlight td:first-child { background: #e3ecff !important; }
+    .cp-table td.cp-agg { background: #eef0fb !important; font-weight: 700; }
+    .cp-table td.cp-input-cell { background: #eff6ff; padding: 3px 5px; }
+    .cp-table td.cp-input-cell input {
+      width: 58px; text-align: right; border: 1px solid #bfdbfe; background: #fff;
+      border-radius: 4px; padding: 3px 4px; font-size: 11.5px;
+    }
+    .cp-table td.cp-input-cell input:focus { outline: none; border-color: var(--accent); }
+    .cp-table td.cp-calc-cell { color: #15803d; font-weight: 600; }
+    .cp-table td.cp-auto-cell { background: #eafbf1; }
+    .cp-table td.cp-auto-cell input { border-color: #a7e8c3; color: #15803d; font-style: italic; }
+    .cp-table thead th[title] { cursor: help; text-decoration: underline dotted; text-decoration-color: #f59e0b; }
+
+    /* ── Line chips ─────────────────────────────────────────────── */
+    .cp-line-chips { display: flex; gap: 6px; flex-wrap: wrap; margin: 0 0 12px 28px; }
+    .cp-line-chip {
+      padding: 6px 16px; border-radius: 99px; border: 1px solid var(--border-solid2); background: var(--bg-1);
+      font-size: 12px; font-weight: 600; color: var(--text-3); cursor: pointer; transition: background .12s, color .12s;
+    }
+    .cp-line-chip:hover  { background: var(--bg-2); }
+    .cp-line-chip.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+    /* ── Scenario comparison ───────────────────────────────────── */
+    .cp-scenario-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr));
+      gap: 14px; margin-left: 28px;
+    }
+    .cp-scenario-col { border: 1px solid var(--border-solid2); border-radius: 10px; padding: 14px; background: var(--bg-1); }
+    .cp-scenario-title { font-size: 13px; font-weight: 700; color: var(--text-1); margin-bottom: 2px; }
+    .cp-scenario-sub { font-size: 10.5px; color: var(--text-4); margin-bottom: 10px; }
+    .cp-scenario-hdr {
+      display: flex; font-size: 9.5px; font-weight: 700; color: var(--text-4); text-transform: uppercase;
+      letter-spacing: .04em; padding: 0 0 4px; border-bottom: 1px solid var(--border-solid2); margin-bottom: 2px;
+    }
+    .cp-scenario-hdr span:first-child { flex: 1; }
+    .cp-scenario-hdr span { width: 44px; text-align: center; }
+    .cp-scenario-row { display: flex; align-items: center; padding: 4px 0; border-bottom: 1px solid var(--border); font-size: 12px; }
+    .cp-scenario-row .lbl { flex: 1; color: var(--text-2); }
+    .cp-scenario-row span.cell { width: 44px; display: flex; justify-content: center; }
+    .cp-scenario-row input {
+      width: 36px; text-align: center; border: 1px solid #bfdbfe; background: #fff;
+      border-radius: 4px; padding: 3px 2px; font-size: 11px;
+    }
+    .cp-scenario-notes { margin-top: 12px; padding-top: 10px; border-top: 1px dashed var(--border-solid2); }
+    .cp-scenario-notes-title { font-size: 10.5px; font-weight: 700; color: var(--text-3); margin-bottom: 6px; }
+    .cp-scenario-notes textarea {
+      width: 100%; min-height: 84px; font-size: 11px; line-height: 1.5; border: 1px solid var(--border-solid2);
+      border-radius: 6px; padding: 8px; resize: vertical; background: var(--bg-1); color: var(--text-2); font-family: inherit;
+    }
+    .cp-scenario-notes textarea:focus { outline: none; border-color: var(--accent); }
+  </style>
+</head>
+<body>
+<div class="app-layout">
+  <div id="sidebarMount"></div>
+  <div class="main-content">
+    <div id="topbarMount"></div>
+    <div class="page-body">
+
+      <!-- Controls -->
+      <div class="flex items-center gap-3 mb-4 flex-wrap">
+        <div class="period-bar" style="margin-bottom:0">
+          <span class="period-label">Tahun:</span>
+          <select id="cpYearSelect" class="form-control" style="width:auto"></select>
+          <button class="btn btn-ghost btn-sm" id="cpAddYearBtn">+ Tambah Tahun</button>
+        </div>
+        <div class="ml-auto flex gap-2">
+          <button class="btn btn-primary btn-sm" id="cpSaveBtn">Simpan</button>
+        </div>
+      </div>
+
+      <!-- Tabs -->
+      <nav class="cp-tabs" id="cpTabs">
+        <button class="cp-tab active" data-tab="assy">LvC Assy</button>
+        <button class="cp-tab" data-tab="charging">LvC Charging</button>
+        <button class="cp-tab" data-tab="formation">LvC Formation</button>
+        <button class="cp-tab" data-tab="pasting_casting">LvC Pasting Casting</button>
+        <button class="cp-tab" data-tab="grid_casting">LvC Grid Casting</button>
+      </nav>
+
+      <!-- ── Panel: LvC Assy ──────────────────────────────────── -->
+      <div class="cp-panel active" id="panel-assy">
+
+        <div class="cp-section-title"><span class="cp-section-num">1</span>Ringkasan Bulanan</div>
+        <div class="cp-section-desc">Input dasar (Instal Capacity, Loading Order, Hari Kerja, Group) — baris hijau/biru dihitung otomatis dari Detail per Line (bagian 2), termasuk Setting Capacity yang sekarang penjumlahan kapasitas seluruh Line.</div>
+        <div class="cp-legend">
+          <span><i style="background:#eff6ff;border-color:#bfdbfe"></i>Input manual</span>
+          <span><i style="background:#f7f8fc"></i>Hasil hitung otomatis</span>
+          <span><i style="background:#eef4ff;border-color:#bfdbfe"></i>KPI akhir</span>
+        </div>
+        <div class="cp-table-wrap">
+          <table class="cp-table" id="cpSummaryTable">
+            <thead><tr id="cpSummaryHead"></tr></thead>
+            <tbody id="cpSummaryBody"></tbody>
+          </table>
+        </div>
+
+        <div class="cp-section-title"><span class="cp-section-num">2</span>Detail per Line</div>
+        <div class="cp-section-desc">Setting Shift 1/2/3 otomatis = (menit efektif shift ÷ Weighted Average Cycle Time) — CT & penugasan Line per model diambil dari Database PCS, mix qty-nya dari Data Order bulan bersangkutan. Kosongkan sel untuk kembali ke auto; isi angka untuk override manual. Header bulan bertanda ⚠ berarti ada qty Data Order yang tidak match ke Database PCS. HOT/DOT tetap input manual (keputusan lembur, bukan hasil hitung kapasitas).</div>
+        <div class="cp-legend">
+          <span><i style="background:#eff6ff;border-color:#bfdbfe"></i>Override manual</span>
+          <span><i style="background:#eafbf1;border-color:#a7e8c3"></i>Auto dari Data Order × Database PCS</span>
+        </div>
+        <div class="cp-line-chips" id="cpLineChips"></div>
+        <div class="cp-table-wrap">
+          <table class="cp-table" id="cpLineTable">
+            <thead><tr id="cpLineHead"></tr></thead>
+            <tbody id="cpLineBody"></tbody>
+          </table>
+        </div>
+
+        <div class="cp-section-title"><span class="cp-section-num">3</span>Perencanaan Group per Skenario</div>
+        <div class="cp-section-desc">Perbandingan alokasi jumlah group HOT/DOT antar skenario, untuk memutuskan opsi penambahan kapasitas.</div>
+        <div class="cp-scenario-grid" id="cpScenarioGrid"></div>
+
+      </div>
+
+      <!-- ── Placeholder panels ───────────────────────────────── -->
+      <div class="cp-panel" id="panel-charging">
+        <div class="empty-state" style="margin-top:60px">
+          <div class="empty-icon">🔋</div>
+          <div class="empty-title">LvC Charging</div>
+          <div class="empty-text">Konten tab ini sedang dalam pengembangan.</div>
+        </div>
+      </div>
+      <div class="cp-panel" id="panel-formation">
+        <div class="empty-state" style="margin-top:60px">
+          <div class="empty-icon">⚡</div>
+          <div class="empty-title">LvC Formation</div>
+          <div class="empty-text">Konten tab ini sedang dalam pengembangan.</div>
+        </div>
+      </div>
+      <div class="cp-panel" id="panel-pasting_casting">
+        <div class="empty-state" style="margin-top:60px">
+          <div class="empty-icon">🏭</div>
+          <div class="empty-title">LvC Pasting Casting</div>
+          <div class="empty-text">Konten tab ini sedang dalam pengembangan.</div>
+        </div>
+      </div>
+      <div class="cp-panel" id="panel-grid_casting">
+        <div class="empty-state" style="margin-top:60px">
+          <div class="empty-icon">🏭</div>
+          <div class="empty-title">LvC Grid Casting</div>
+          <div class="empty-text">Konten tab ini sedang dalam pengembangan.</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script src="shared-components.js"></script>
+<script>
+/* ================================================================
+   Capacity Planning — LvC Assy
+   Digitalisasi "LVC Assy.xlsx", disusun ulang jadi 3 bagian berurutan:
+   1. Ringkasan Bulanan (KPI, sepenuhnya bottom-up dari bagian 2)
+   2. Detail per Line — Setting Shift 1/2/3 = (menit efektif shift ÷ Weighted
+      Average Cycle Time), CT & penugasan Line per model dari Database PCS,
+      mix qty dari Data Order bulan bersangkutan. Bisa di-override manual
+      per sel (kosongkan untuk kembali ke auto). HOT/DOT tetap input manual.
+   3. Perencanaan Group per Skenario (what-if 3 skenario)
+   ================================================================ */
+
+const MONTHS_ABR = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
+const ASSY_LINES = ['Line 1','Line 2','Line 3','Line 4','Line 5','Line 6','Line 7'];
+const SCENARIO_PROCS = [
+  'Line 1','Line 2','Line 3','Line 4','Line 5','Line 6','Line 7',
+  'Wet A & F','MCB','Formation','Pasting Casting','Grid Casting','Pasting Punching','Grid Punching','Ballmill',
+];
+
+/* Data awal 2026, diekstrak dari LVC Assy.xlsx (sheet "LvC Assy") */
+const ASSY_SEED_2026 = {"monthly":{"instalCapacity":[309.218,293.757,262.835,324.679,293.757,309.218,355.601,293.757,340.14,324.679,324.679,324.679],"loadingOrder":[227.967,232.686,178.457,233.821,219.255,176.72,171.959,162.216,169.604,179.739,179.969,159.91],"workingDays":[20,19,17,21,19,20,23,19,22,21,21,21],"groupAssy":[12,12,12,12,12,12,12,12,12,12,12,12],"settingCapPerDay":[9893.227,9893.227,9893.227,9893.227,9893.227,9893.227,9893.227,9893.227,9893.227,9893.227,9893.227,9893.227]},"lines":{"Line 1":{"s1":[1050,1050,1050,1050,1050,1050,1050,1050,1050,1050,1050,1050],"s2":[900,900,900,900,900,900,900,900,900,900,900,900],"s3":[0,0,0,0,0,0,0,0,0,0,0,0],"hotDay":[2,2,0,0,1,0,0,0,0,0,0,0],"hotLineShift":[4,4,0,0,2,0,0,0,0,0,0,0],"hotBattery":[3900,3900,0,0,1950,0,0,0,0,0,0,0],"dot":[4,4,2,4,5,0,0,0,0,0,0,0],"dotBattery":[1800,1800,900,1800,2250,0,0,0,0,0,0,0]},"Line 2":{"s1":[728.372,728.372,728.372,728.372,728.372,728.372,728.372,728.372,728.372,728.372,728.372,728.372],"s2":[0,0,0,0,0,0,0,0,0,0,0,0],"s3":[0,0,0,0,0,0,0,0,0,0,0,0],"hotDay":[0,2,0,0,1,0,0,0,0,0,0,0],"hotLineShift":[0,2,0,0,1,0,0,0,0,0,0,0],"hotBattery":[0,1456.744,0,0,728.372,0,0,0,0,0,0,0],"dot":[4,4,2,2,8,0,0,0,0,0,0,0],"dotBattery":[1456.744,1456.744,728.372,728.372,2913.488,0,0,0,0,0,0,0]},"Line 3":{"s1":[1050,1050,1050,1050,1050,1050,1050,1050,1050,1050,1050,1050],"s2":[0,0,0,0,0,0,0,0,0,0,0,0],"s3":[0,0,0,0,0,0,0,0,0,0,0,0],"hotDay":[0,3,0,0,1,0,0,0,0,0,0,0],"hotLineShift":[0,3,0,0,1,0,0,0,0,0,0,0],"hotBattery":[0,3150,0,0,1050,0,0,0,0,0,0,0],"dot":[4,4,4,4,6,0,0,0,0,0,0,0],"dotBattery":[2100,2100,2100,2100,3150,0,0,0,0,0,0,0]},"Line 4":{"s1":[534.855,534.855,534.855,534.855,534.855,534.855,534.855,534.855,534.855,534.855,534.855,534.855],"s2":[450,450,450,450,450,450,450,450,450,450,450,450],"s3":[0,0,0,0,0,0,0,0,0,0,0,0],"hotDay":[2,2,0,2,0,0,0,0,0,0,0,0],"hotLineShift":[4,4,0,4,0,0,0,0,0,0,0,0],"hotBattery":[1969.711,1969.711,0,1969.711,0,0,0,0,0,0,0,0],"dot":[6,6,4,8,8,0,0,0,0,0,0,0],"dotBattery":[1350,1350,900,1800,1800,0,0,0,0,0,0,0]},"Line 5":{"s1":[1100,1100,1100,1100,1100,1100,1100,1100,1100,1100,1100,1100],"s2":[980,980,980,980,980,980,980,980,980,980,980,980],"s3":[900,900,900,900,900,900,900,900,900,900,900,900],"hotDay":[3,5,2,5,5,0,0,0,0,0,0,0],"hotLineShift":[9,15,6,15,15,0,0,0,0,0,0,0],"hotBattery":[8940,14900,5960,14900,14900,0,0,0,0,0,0,0],"dot":[0,0,0,0,0,0,0,0,0,0,0,0],"dotBattery":[0,0,0,0,0,0,0,0,0,0,0,0]},"Line 6":{"s1":[1000,1000,1000,1000,1000,1000,1000,1000,1000,1000,1000,1000],"s2":[900,900,900,900,900,900,900,900,900,900,900,900],"s3":[0,0,0,0,0,0,0,0,0,0,0,0],"hotDay":[2,2,0,0,0,0,0,0,0,0,0,0],"hotLineShift":[4,4,0,0,0,0,0,0,0,0,0,0],"hotBattery":[3800,3800,0,0,0,0,0,0,0,0,0,0],"dot":[4,5,2,4,0,0,0,0,0,0,0,0],"dotBattery":[1800,2250,900,1800,0,0,0,0,0,0,0,0]},"Line 7":{"s1":[300,300,300,300,300,300,300,300,300,300,300,300],"s2":[0,0,0,0,0,0,0,0,0,0,0,0],"s3":[0,0,0,0,0,0,0,0,0,0,0,0],"hotDay":[0,2,1,2,0,0,0,0,0,0,0,0],"hotLineShift":[0,2,1,2,0,0,0,0,0,0,0,0],"hotBattery":[0,600,300,600,0,0,0,0,0,0,0,0],"dot":[4,6,4,6,4,0,0,0,0,0,0,0],"dotBattery":[600,900,600,900,600,0,0,0,0,0,0,0]}},"ref":{"assy":{"Line 1":{"s1":1050,"s2":900,"s3":800,"total":2750},"Line 2":{"s1":728.372,"s2":678.14,"s3":619.535,"total":2026.047},"Line 3":{"s1":1050,"s2":930,"s3":820,"total":2800},"Line 4":{"s1":534.855,"s2":450,"s3":400,"total":1384.855},"Line 5":{"s1":1100,"s2":980,"s3":900,"total":2980},"Line 6":{"s1":1000,"s2":900,"s3":800,"total":2700},"Line 7":{"s1":300,"s2":270,"s3":250,"total":820}},"wet":{"Wet.A":{"s1":1100,"s2":1000,"s3":900,"total":3000},"Wet.F":{"s1":800,"s2":700,"s3":500,"total":2000}},"mcb":{"MCB KIT":{"s1":0,"s2":0,"s3":0,"total":0},"MCB Sealed":{"s1":0,"s2":0,"s3":0,"total":0}}},"scenario":{"s1":{"rows":{"Line 1":{"hot":1,"dot":5},"Line 2":{"hot":1,"dot":8},"Line 3":{"hot":1,"dot":8},"Line 4":{"hot":"","dot":8},"Line 5":{"hot":6,"dot":""},"Line 6":{"hot":"","dot":""},"Line 7":{"hot":"","dot":4},"Wet A & F":{"hot":4,"dot":""},"MCB":{"hot":2,"dot":""},"Formation":{"hot":3,"dot":""},"Pasting Casting":{"hot":3,"dot":6},"Grid Casting":{"hot":3,"dot":""},"Pasting Punching":{"hot":2,"dot":6},"Grid Punching":{"hot":"","dot":3},"Ballmill":{"hot":9,"dot":""}},"notes":["1). Tetap 12 Group Existing","2). Over Time Assy Sangat Tinggi","3). Over Time Plate Making Tinggi","4). Over Time Ballmill tinggi"],"title":"Skenario 1 (12 Group)"},"s2":{"rows":{"Line 1":{"hot":1,"dot":5},"Line 2":{"hot":"","dot":""},"Line 3":{"hot":1,"dot":8},"Line 4":{"hot":"","dot":8},"Line 5":{"hot":2,"dot":""},"Line 6":{"hot":"","dot":""},"Line 7":{"hot":"","dot":4},"Wet A & F":{"hot":4,"dot":""},"MCB":{"hot":2,"dot":""},"Formation":{"hot":3,"dot":""},"Pasting Casting":{"hot":"","dot":""},"Grid Casting":{"hot":"","dot":""},"Pasting Punching":{"hot":"","dot":""},"Grid Punching":{"hot":"","dot":""},"Ballmill":{"hot":"","dot":""}},"notes":["1). Add 1 Group Line 2 (9mp)","2). Total Assy : 13 Group","3). Add 1 Group Pasting (4mp)","4). Add 3 MC grid Casting (3mp)"],"title":"Skenario 2 (13 group)"},"s3":{"rows":{"Line 1":{"hot":1,"dot":5},"Line 2":{"hot":1,"dot":8},"Line 3":{"hot":1,"dot":8},"Line 4":{"hot":"","dot":8},"Line 5":{"hot":3,"dot":""},"Line 6":{"hot":"","dot":""},"Line 7":{"hot":"","dot":4},"Wet A & F":{"hot":4,"dot":""},"MCB":{"hot":2,"dot":""},"Formation":{"hot":3,"dot":""},"Pasting Casting":{"hot":3,"dot":6},"Grid Casting":{"hot":3,"dot":""},"Pasting Punching":{"hot":2,"dot":6},"Grid Punching":{"hot":"","dot":3},"Ballmill":{"hot":9,"dot":""}},"notes":["1). MCB HOT Tanggal 2 dan 10","2). Tanggal 11 Pindah ke line 2 (2 Shift)","3). 3MP Improvement ke line 2","4). Over Time Plate Making  tinggi","5). Over Time Ballmill tinggi"],"title":"Skenario 3 (12,5 group)"}}};
+
+let currentYear = '2026';
+let currentLine = 'Line 1';
+
+// ── Helpers ─────────────────────────────────────────────────────────────
+function zeros12() { return new Array(12).fill(0); }
+function sumArr(a) { return a.reduce((s, v) => s + (Number(v) || 0), 0); }
+function avgArr(a) { return a.length ? sumArr(a) / a.length : 0; }
+function fmtNum(v, dec) {
+  if (v == null || isNaN(v)) return '—';
+  return Number(v).toLocaleString('id-ID', { minimumFractionDigits: dec, maximumFractionDigits: dec });
+}
+
+function nulls12() { return new Array(12).fill(null); }
+
+function emptyLineData() {
+  const o = {};
+  ASSY_LINES.forEach(l => {
+    // s1/s2/s3 = null berarti "auto" (dihitung dari mix Data Order × Database PCS)
+    o[l] = { s1: nulls12(), s2: nulls12(), s3: nulls12(), hotDay: zeros12(), hotLineShift: zeros12(), hotBattery: zeros12(), dot: zeros12(), dotBattery: zeros12() };
+  });
+  return o;
+}
+function emptyScenario() {
+  const o = {};
+  ['s1', 's2', 's3'].forEach((k, i) => { o[k] = { title: `Skenario ${i + 1}`, rows: {}, notes: [] }; });
+  return o;
+}
+
+// ── State ─────────────────────────────────────────────────────────────
+function ensureAssyRoot() {
+  const state = BPMS.getState();
+  if (!state.capacityPlanning) state.capacityPlanning = {};
+  if (!state.capacityPlanning.assy) state.capacityPlanning.assy = {};
+  const assy = state.capacityPlanning.assy;
+  if (!assy.years) assy.years = {};
+  return assy;
+}
+
+function ensureYear(year) {
+  const assy = ensureAssyRoot();
+  if (!assy.years[year]) {
+    if (year === '2026') {
+      // Setting Shift 1/2/3 hasil digitalisasi awal diperlakukan sebagai override manual
+      // (angka asli dari Excel, belum tentu berasal dari mix Data Order bulan itu).
+      assy.years[year] = {
+        monthly: BPMS.deepClone(ASSY_SEED_2026.monthly),
+        lines: BPMS.deepClone(ASSY_SEED_2026.lines),
+        scenario: BPMS.deepClone(ASSY_SEED_2026.scenario),
+      };
+    } else {
+      assy.years[year] = {
+        monthly: { instalCapacity: zeros12(), loadingOrder: zeros12(), workingDays: zeros12(), groupAssy: zeros12() },
+        lines: emptyLineData(),
+        scenario: emptyScenario(),
+      };
+    }
+  }
+  return assy.years[year];
+}
+
+// ── Weighted Average Cycle Time (Data Order × Database PCS) ──────────
+// Setting Shift (pcs/hari) = menit efektif shift ÷ Weighted Avg CT, per Line per bulan.
+// CT & penugasan Line per model battery diambil dari Database PCS (dbPCS: line1/ct1, line2/ct2);
+// mix qty (bobot) diambil dari Data Order (state.orders["YYYY-MM"]) bulan bersangkutan.
+const SHIFT_MINUTES = { s1: 435, s2: 405, s3: 370 };
+
+function periodOf(year, monthIdx) { return `${year}-${String(monthIdx + 1).padStart(2, '0')}`; }
+
+let _mixCache = {}; // period -> { map: Map(line -> {sumQty, sumQtyCt}), unmatched, totalQty }
+
+/* Kolom LINE(1st)/LINE(2nd) di Database PCS adalah teks bebas (bisa "Line 1" atau cuma "1").
+   Normalisasi ke "Line N" supaya kedua gaya penulisan match ke Assy Line yang sama. */
+function normalizeAssyLine(raw) {
+  const s = String(raw || '').trim();
+  const m = s.match(/^(?:line\s*)?0*([1-7])$/i);
+  return m ? `Line ${m[1]}` : null;
+}
+
+function computeLineMonthlyMix(period) {
+  if (_mixCache[period]) return _mixCache[period];
+  const orders = BPMS.getState().orders?.[period] || [];
+  const map = new Map();
+  let unmatched = 0;
+  let totalQty  = 0;
+  for (const ord of orders) {
+    const qty = Number(ord.qty) || 0;
+    totalQty += qty;
+    if (!qty) continue;
+    const parsed = ord._parsed || BPMS.parseItemString(ord.item);
+    if (!parsed) { unmatched += qty; continue; }
+    const matches = BPMS.findPCSMatches(parsed.battType, parsed.tech, parsed.plate, parsed.separator);
+    if (!matches.length) { unmatched += qty; continue; }
+    const pcs = matches[0];
+    const slots = [];
+    if (pcs.line1) slots.push({ line: pcs.line1, ct: Number(pcs.ct1) || 0 });
+    if (pcs.line2) slots.push({ line: pcs.line2, ct: Number(pcs.ct2) || 0 });
+    for (const { line, ct } of slots) {
+      const canonical = normalizeAssyLine(line);
+      if (!canonical || !ct) continue;
+      if (!map.has(canonical)) map.set(canonical, { sumQty: 0, sumQtyCt: 0 });
+      const m = map.get(canonical);
+      m.sumQty   += qty;
+      m.sumQtyCt += qty * ct;
+    }
+  }
+  const result = { map, unmatched, totalQty };
+  _mixCache[period] = result;
+  return result;
+}
+
+function weightedCTFor(period, line) {
+  const { map } = computeLineMonthlyMix(period);
+  const m = map.get(line);
+  if (!m || !m.sumQty) return null;
+  return m.sumQtyCt / m.sumQty;
+}
+
+/* Nilai efektif sel Setting Shift: override manual (jika diisi) atau hasil auto-calc. */
+function resolveShift(L, key, i, line) {
+  const override = L[key][i];
+  if (override !== null && override !== undefined) return { value: Number(override) || 0, isAuto: false };
+  const weightedCT = weightedCTFor(periodOf(currentYear, i), line);
+  const auto = weightedCT ? Math.round((SHIFT_MINUTES[key] * 60) / weightedCT) : null;
+  return { value: auto, isAuto: true };
+}
+
+function lineDailyCapacity(y, line, i) {
+  const s1 = resolveShift(y.lines[line], 's1', i, line).value || 0;
+  const s2 = resolveShift(y.lines[line], 's2', i, line).value || 0;
+  const s3 = resolveShift(y.lines[line], 's3', i, line).value || 0;
+  return s1 + s2 + s3;
+}
+
+// ── Bagian 1: Ringkasan Bulanan ──────────────────────────────────────
+function computeSummaryDerived(y) {
+  const settingCapPerDay = MONTHS_ABR.map((_, i) => sumArr(ASSY_LINES.map(l => lineDailyCapacity(y, l, i))));
+  const settingCapNormal = settingCapPerDay.map((v, i) => v * (Number(y.monthly.workingDays[i]) || 0) / 1000);
+  const hotLineShift = MONTHS_ABR.map((_, i) => sumArr(ASSY_LINES.map(l => y.lines[l].hotLineShift[i])));
+  const hotBattery   = MONTHS_ABR.map((_, i) => sumArr(ASSY_LINES.map(l => y.lines[l].hotBattery[i])) / 1000);
+  const dotRaw       = MONTHS_ABR.map((_, i) => sumArr(ASSY_LINES.map(l => y.lines[l].dot[i])));
+  const dotLineShift = dotRaw.map(v => v / 2);
+  const dotBattery   = MONTHS_ABR.map((_, i) => sumArr(ASSY_LINES.map(l => y.lines[l].dotBattery[i])) / 1000);
+  const totalSettingCap = settingCapNormal.map((v, i) => v + hotBattery[i] + dotBattery[i]);
+  const loadingRatio = totalSettingCap.map((v, i) => settingCapNormal[i] ? (v / settingCapNormal[i] * 100) : 0);
+  return { settingCapPerDay, settingCapNormal, hotLineShift, hotBattery, dotLineShift, dotBattery, totalSettingCap, loadingRatio };
+}
+
+function renderSummaryTable() {
+  const y = ensureYear(currentYear);
+  const d = computeSummaryDerived(y);
+
+  document.getElementById('cpSummaryHead').innerHTML =
+    '<th>Parameter</th>' + MONTHS_ABR.map(m => `<th>${m}</th>`).join('') +
+    '<th class="cp-agg">Total</th><th class="cp-agg">Rata-rata</th>';
+
+  const rows = [
+    { label: 'Instal Capacity @ 21LS',  unit: 'x1000 pcs/bln', arr: y.monthly.instalCapacity,   dec: 1, input: 'instalCapacity' },
+    { label: 'Loading Order',           unit: 'x1000 pcs/bln', arr: y.monthly.loadingOrder,     dec: 1, input: 'loadingOrder' },
+    { label: 'Working Days Normal',     unit: 'hari',          arr: y.monthly.workingDays,       dec: 0, input: 'workingDays' },
+    { label: 'Jumlah Group Assy',       unit: 'group',         arr: y.monthly.groupAssy,         dec: 0, input: 'groupAssy' },
+    { label: 'Setting Capacity',        unit: 'pcs/hari',      arr: d.settingCapPerDay, dec: 0, computed: true },
+    { label: 'Setting Capacity Normal', unit: 'x1000 pcs/bln', arr: d.settingCapNormal, dec: 1, computed: true },
+    { label: 'HOT (Line-Shift)',        unit: 'line-shift',    arr: d.hotLineShift,     dec: 0, computed: true },
+    { label: 'HOT Battery',             unit: 'x1000 pcs/bln', arr: d.hotBattery,       dec: 2, computed: true },
+    { label: 'DOT (Line-Shift)',        unit: 'line-shift',    arr: d.dotLineShift,     dec: 1, computed: true },
+    { label: 'DOT Battery',             unit: 'x1000 pcs/bln', arr: d.dotBattery,       dec: 2, computed: true },
+    { label: 'Total Setting Capacity',  unit: 'x1000 pcs/bln', arr: d.totalSettingCap,  dec: 1, computed: true, highlight: true },
+    { label: 'Loading Ratio',           unit: '% thd Normal',  arr: d.loadingRatio,     dec: 1, computed: true, highlight: true, isPct: true },
+  ];
+
+  document.getElementById('cpSummaryBody').innerHTML = rows.map(r => {
+    const cells = r.arr.map((v, i) => {
+      if (r.input) {
+        return `<td class="cp-input-cell"><input type="number" step="any" value="${v ?? ''}" data-field="${r.input}" data-idx="${i}" onchange="onSummaryInput(this)"></td>`;
+      }
+      return `<td class="cp-calc-cell">${fmtNum(v, r.dec)}${r.isPct ? '%' : ''}</td>`;
+    }).join('');
+    const total = sumArr(r.arr), avg = avgArr(r.arr);
+    const totalTxt = r.isPct ? '—' : fmtNum(total, r.dec);
+    const avgTxt   = fmtNum(avg, r.dec) + (r.isPct ? '%' : '');
+    const trClass  = r.highlight ? 'cp-highlight' : (r.computed ? 'cp-computed' : '');
+    return `<tr class="${trClass}"><td>${r.label}<div class="cp-unit">${r.unit}</div></td>${cells}<td class="cp-agg">${totalTxt}</td><td class="cp-agg">${avgTxt}</td></tr>`;
+  }).join('');
+}
+
+function onSummaryInput(el) {
+  const y = ensureYear(currentYear);
+  y.monthly[el.dataset.field][Number(el.dataset.idx)] = parseFloat(el.value) || 0;
+  renderSummaryTable();
+}
+
+// ── Bagian 2: Detail per Line ────────────────────────────────────────
+const LINE_ROW_CONFIG = [
+  { key: '_weightedCT',  label: 'Weighted Avg Cycle Time', unit: 'detik/battery', dec: 2, computed: true, noSum: true },
+  { key: 's1',           label: 'Setting Shift 1',      unit: 'pcs/hari',   dec: 0, input: true },
+  { key: 's2',           label: 'Setting Shift 2',      unit: 'pcs/hari',   dec: 0, input: true },
+  { key: 's3',           label: 'Setting Shift 3',      unit: 'pcs/hari',   dec: 0, input: true },
+  { key: '_totalCap',    label: 'Total Kapasitas/Hari', unit: 'pcs/hari',   dec: 0, computed: true },
+  { key: 'hotDay',       label: 'HOT',                  unit: 'hari',       dec: 0, input: true },
+  { key: 'hotLineShift', label: 'HOT (Line-Shift)',     unit: 'line-shift', dec: 0, input: true },
+  { key: 'hotBattery',   label: 'HOT Total Battery',    unit: 'pcs',        dec: 0, input: true },
+  { key: 'dot',          label: 'DOT (Line-Shift)',     unit: 'line-shift', dec: 0, input: true },
+  { key: 'dotBattery',   label: 'DOT Total Battery',    unit: 'pcs',        dec: 0, input: true },
+];
+
+function renderLineChips() {
+  document.getElementById('cpLineChips').innerHTML = ASSY_LINES.map(l =>
+    `<button class="cp-line-chip ${l === currentLine ? 'active' : ''}" onclick="selectLine('${l}')">${l}</button>`
+  ).join('');
+}
+
+function selectLine(l) {
+  currentLine = l;
+  renderLineChips();
+  renderLineTable();
+}
+
+/* Info per cell Setting Shift 1/2/3: { value, isAuto } — value bisa null (belum ada data order/override). */
+function computeLineRowValues(r, y, line) {
+  if (r.key === '_weightedCT') {
+    const arr = MONTHS_ABR.map((_, i) => weightedCTFor(periodOf(currentYear, i), line));
+    return { cellsInfo: arr.map(v => ({ value: v, isAuto: null })), numericArr: arr.map(v => v || 0) };
+  }
+  if (r.key === '_totalCap') {
+    const arr = MONTHS_ABR.map((_, i) => lineDailyCapacity(y, line, i));
+    return { cellsInfo: arr.map(v => ({ value: v, isAuto: null })), numericArr: arr };
+  }
+  if (r.key === 's1' || r.key === 's2' || r.key === 's3') {
+    const cellsInfo = MONTHS_ABR.map((_, i) => resolveShift(y.lines[line], r.key, i, line));
+    return { cellsInfo, numericArr: cellsInfo.map(c => c.value || 0) };
+  }
+  const arr = y.lines[line][r.key];
+  return { cellsInfo: arr.map(v => ({ value: v, isAuto: null })), numericArr: arr };
+}
+
+function renderLineTable() {
+  const y = ensureYear(currentYear);
+
+  document.getElementById('cpLineHead').innerHTML =
+    '<th>Parameter</th>' + MONTHS_ABR.map((m, i) => {
+      const period = periodOf(currentYear, i);
+      const { unmatched, totalQty } = computeLineMonthlyMix(period);
+      if (totalQty > 0 && unmatched > 0) {
+        const pct = Math.round((unmatched / totalQty) * 100);
+        return `<th title="${unmatched.toLocaleString('id-ID')} dari ${totalQty.toLocaleString('id-ID')} qty Data Order (${pct}%) tidak match ke Database PCS">${m} ⚠</th>`;
+      }
+      return `<th>${m}</th>`;
+    }).join('') +
+    '<th class="cp-agg">Total</th><th class="cp-agg">Rata-rata</th>';
+
+  document.getElementById('cpLineBody').innerHTML = LINE_ROW_CONFIG.map(r => {
+    const { cellsInfo, numericArr } = computeLineRowValues(r, y, currentLine);
+    const cells = cellsInfo.map((c, i) => {
+      if (!r.input) return `<td class="cp-calc-cell">${fmtNum(c.value, r.dec)}</td>`;
+      const cls  = c.isAuto ? ' cp-auto-cell' : '';
+      const hint = c.isAuto
+        ? 'title="Otomatis dari mix Data Order × Database PCS — isi angka untuk override, kosongkan untuk kembali ke auto"'
+        : 'title="Nilai override manual — kosongkan untuk kembali ke auto"';
+      return `<td class="cp-input-cell${cls}"><input type="number" step="any" value="${c.value == null ? '' : c.value}" placeholder="auto" data-key="${r.key}" data-idx="${i}" onchange="onLineInput(this)" ${hint}></td>`;
+    }).join('');
+    const totalTxt = r.noSum ? '—' : fmtNum(sumArr(numericArr), r.dec);
+    const avgTxt    = fmtNum(avgArr(numericArr), r.dec);
+    const trClass = r.computed ? 'cp-computed' : '';
+    return `<tr class="${trClass}"><td>${r.label}<div class="cp-unit">${r.unit}</div></td>${cells}<td class="cp-agg">${totalTxt}</td><td class="cp-agg">${avgTxt}</td></tr>`;
+  }).join('');
+}
+
+function onLineInput(el) {
+  const y = ensureYear(currentYear);
+  const L = y.lines[currentLine];
+  const key = el.dataset.key;
+  const idx = Number(el.dataset.idx);
+  if (key === 's1' || key === 's2' || key === 's3') {
+    L[key][idx] = el.value === '' ? null : (parseFloat(el.value) || 0); // '' → kembali ke auto
+  } else {
+    L[key][idx] = parseFloat(el.value) || 0;
+  }
+  renderLineTable();
+  renderSummaryTable(); // roll-up ke Ringkasan Bulanan ikut berubah
+}
+
+// ── Bagian 3: Perencanaan Group per Skenario ─────────────────────────
+function renderScenarioGrid() {
+  const y = ensureYear(currentYear);
+  document.getElementById('cpScenarioGrid').innerHTML = ['s1', 's2', 's3'].map(skey => {
+    const sc = y.scenario[skey] || { title: skey, rows: {}, notes: [] };
+    const rowsHtml = SCENARIO_PROCS.map(name => {
+      const r = sc.rows[name] || { hot: '', dot: '' };
+      return `<div class="cp-scenario-row">
+        <span class="lbl">${name}</span>
+        <span class="cell"><input type="text" value="${r.hot}" onchange="onScenarioInput(this,'${skey}','${name}','hot')"></span>
+        <span class="cell"><input type="text" value="${r.dot}" onchange="onScenarioInput(this,'${skey}','${name}','dot')"></span>
+      </div>`;
+    }).join('');
+    return `<div class="cp-scenario-col">
+      <div class="cp-scenario-title">${sc.title || skey}</div>
+      <div class="cp-scenario-sub">Jumlah group per proses</div>
+      <div class="cp-scenario-hdr"><span></span><span>HOT</span><span>DOT</span></div>
+      ${rowsHtml}
+      <div class="cp-scenario-notes">
+        <div class="cp-scenario-notes-title">Catatan</div>
+        <textarea onchange="onScenarioNotes(this,'${skey}')">${(sc.notes || []).join('\n')}</textarea>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function onScenarioInput(el, skey, name, field) {
+  const y = ensureYear(currentYear);
+  if (!y.scenario[skey].rows[name]) y.scenario[skey].rows[name] = { hot: '', dot: '' };
+  y.scenario[skey].rows[name][field] = el.value;
+}
+
+function onScenarioNotes(el, skey) {
+  const y = ensureYear(currentYear);
+  y.scenario[skey].notes = el.value.split('\n').map(s => s.trim()).filter(Boolean);
+}
+
+// ── Year selector & Tabs ──────────────────────────────────────────────
+function populateYearSelect() {
+  const assy  = ensureAssyRoot();
+  const years = new Set(Object.keys(assy.years));
+  years.add('2026');
+  const sorted = [...years].sort().reverse();
+
+  const sel  = document.getElementById('cpYearSelect');
+  const prev = sel.value || currentYear;
+  sel.innerHTML = sorted.map(y => `<option value="${y}">${y}</option>`).join('');
+  sel.value = sorted.includes(prev) ? prev : sorted[0];
+  currentYear = sel.value;
+}
+
+function renderAssyTab() {
+  _mixCache = {}; // Data Order/Database PCS bisa berubah antar kunjungan — hitung ulang mix per render pass
+  renderSummaryTable();
+  renderLineChips();
+  renderLineTable();
+  renderScenarioGrid();
+}
+
+function pageInit() {
+  document.getElementById('topbarMount').innerHTML = BPMS.renderTopbar(
+    'Capacity Planning', '<span class="text-muted text-sm">Loading vs Capacity — Perencanaan Kapasitas per Proses</span>');
+
+  populateYearSelect();
+  renderAssyTab();
+
+  document.getElementById('cpYearSelect').addEventListener('change', e => {
+    currentYear = e.target.value;
+    renderAssyTab();
+  });
+
+  document.getElementById('cpAddYearBtn').addEventListener('click', () => {
+    const input = window.prompt('Tahun baru (mis. 2027):', String(new Date().getFullYear() + 1));
+    if (!input) return;
+    const yr = input.trim();
+    if (!/^\d{4}$/.test(yr)) { BPMS.toast('Tahun tidak valid', 'error'); return; }
+    ensureYear(yr);
+    populateYearSelect();
+    document.getElementById('cpYearSelect').value = yr;
+    currentYear = yr;
+    renderAssyTab();
+    BPMS.toast(`Tahun ${yr} ditambahkan`, 'success');
+  });
+
+  document.getElementById('cpTabs').addEventListener('click', e => {
+    const btn = e.target.closest('.cp-tab');
+    if (!btn) return;
+    document.querySelectorAll('.cp-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.cp-panel').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('panel-' + btn.dataset.tab).classList.add('active');
+  });
+
+  document.getElementById('cpSaveBtn').addEventListener('click', async () => {
+    BPMS.showLoading();
+    const ok = await BPMS.saveState();
+    BPMS.hideLoading();
+    BPMS.toast(ok ? 'Capacity Planning disimpan' : 'Tersimpan lokal (server offline)', ok ? 'success' : 'info');
+  });
+}
+</script>
+</body>
+</html>

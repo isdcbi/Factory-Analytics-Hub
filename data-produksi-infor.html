@@ -1287,12 +1287,8 @@ function computeGenPiRow(r, maps) {
   const item = r.item || '';
   const qty  = r.qty  || 0;
 
-  // Code: MID(item, 5, 1) — juga merupakan kode Category
+  // Code: MID(item, 5, 1)
   const code = item.charAt(4);
-
-  // Category: char ke-3 prefix PN Battery (posisi 4 pada item Infor)
-  const catMap = { D: 'DRY', W: 'WET', U: 'DUC' };
-  const category = catMap[code] || '';
 
   // Battery Type: segmen ke-3 dari item Infor (F-PREFIX-BATTTYPE-...)
   const batteryType = item.split('-')[2] || '';
@@ -1309,6 +1305,11 @@ function computeGenPiRow(r, maps) {
   }
   // Code Battery: MID(itemBattery, 3, 17) = substring(2, 19)
   const codeBattery = itemBattery.substring(2, 19);
+
+  // Category: char ke-3 prefix PN Battery — dibaca dari itemBattery SETELAH konversi
+  // (item W-..U. menjadi F-..W. → WET; jika dibaca dari item mentah, WET tidak pernah muncul)
+  const catMap = { D: 'DRY', W: 'WET', U: 'DUC' };
+  const category = catMap[itemBattery.charAt(4)] || '';
 
   // Year dari trxDate "DD/MM/YYYY"
   const year = r.trxDate ? r.trxDate.slice(-4) : '';

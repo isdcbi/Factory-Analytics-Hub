@@ -72,6 +72,11 @@ const BPMS = (() => {
           icon: `<svg viewBox="0 0 16 16" fill="currentColor" class="nav-icon"><path d="M3 2h10a1 1 0 011 1v10a1 1 0 01-1 1H3a1 1 0 01-1-1V3a1 1 0 011-1zm0 4h10V3H3v3zm3 1H3v6h3V7zm4 0H7v3h3V7zm3 0h-2v6h2V7zm-4 3H7v3h3v-3z"/></svg>`,
         },
         {
+          href: 'capacity-planning.html',
+          label: 'Capacity Planning',
+          icon: `<svg viewBox="0 0 16 16" fill="currentColor" class="nav-icon"><path d="M2 14V8h2.5v6H2zm4.75 0V4h2.5v10h-2.5zm4.75 0V6H14v8h-2.5z"/></svg>`,
+        },
+        {
           href: 'lvc-analysis.html',
           label: 'LVC Analysis',
           icon: `<svg viewBox="0 0 16 16" fill="currentColor" class="nav-icon"><path d="M1 14L5 8.5l3 2.5 4-6L15 7V14H1z" opacity=".25"/><path d="M1 14L5 8.5l3 2.5 4-6L15 7" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>`,
@@ -105,6 +110,47 @@ const BPMS = (() => {
           href: 'data-produksi-baan.html',
           label: 'Data Produksi BaaN',
           icon: `<svg viewBox="0 0 16 16" fill="currentColor" class="nav-icon"><path d="M1 11h3V6H1v5zm4 2h3V3H5v10zm4-6h3v6H9V7zm-8 6h14v1.5H1V13z" opacity=".8"/><circle cx="13" cy="4" r="2.5" fill="var(--accent)" opacity=".6"/></svg>`,
+        },
+      ],
+    },
+    {
+      // Satu halaman (standardized-work.html) dengan view per hash; menu aktif diatur sw/app.js.
+      label: 'Standardized Work',
+      items: [
+        {
+          href: 'standardized-work.html#home',
+          label: 'Dashboard',
+          icon: `<svg viewBox="0 0 16 16" fill="currentColor" class="nav-icon"><rect x="1" y="1" width="6" height="7" rx="1"/><rect x="9" y="1" width="6" height="4" rx="1"/><rect x="1" y="10" width="6" height="5" rx="1"/><rect x="9" y="7" width="6" height="8" rx="1"/></svg>`,
+        },
+        {
+          href: 'standardized-work.html#observasi',
+          label: 'Lembar Observasi',
+          icon: `<svg viewBox="0 0 16 16" fill="currentColor" class="nav-icon"><path d="M5 1h6v2H5z"/><path d="M3 2h1.5v1.5h7V2H13a1 1 0 011 1v11a1 1 0 01-1 1H3a1 1 0 01-1-1V3a1 1 0 011-1zm2 4.5v1.5h6V6.5H5zm0 3v1.5h6V9.5H5zm0 3V14h4v-1.5H5z"/></svg>`,
+        },
+        {
+          href: 'standardized-work.html#data-observasi',
+          label: 'Data Observasi',
+          icon: `<svg viewBox="0 0 16 16" fill="currentColor" class="nav-icon"><ellipse cx="8" cy="4.5" rx="5.5" ry="2"/><path d="M2.5 4.5v2c0 1.1 2.5 2 5.5 2s5.5-.9 5.5-2v-2"/><path d="M2.5 8.5v2c0 1.1 2.5 2 5.5 2s5.5-.9 5.5-2v-2"/></svg>`,
+        },
+        {
+          href: 'standardized-work.html#tskk',
+          label: 'TSKK',
+          icon: `<svg viewBox="0 0 16 16" fill="currentColor" class="nav-icon"><path d="M2 2h12a1 1 0 011 1v10a1 1 0 01-1 1H2a1 1 0 01-1-1V3a1 1 0 011-1zm0 1.5V6h4.5V3.5H2zm0 4V13h4.5V7.5H2zM8 3.5v9.5h6V3.5H8z" opacity=".35"/><path d="M8.5 5h3.5v1.2H8.5zM9.5 7.5h3.5v1.2H9.5zM10.5 10h3v1.2h-3z"/></svg>`,
+        },
+        {
+          href: 'standardized-work.html#tsk',
+          label: 'TSK',
+          icon: `<svg viewBox="0 0 16 16" fill="currentColor" class="nav-icon"><rect x="1" y="2" width="5" height="4" rx="1"/><rect x="10" y="2" width="5" height="4" rx="1"/><rect x="5.5" y="10" width="5" height="4" rx="1"/><path d="M6 4h4M12.5 6v2.5L9 10.5M3.5 6v2.5L7 10.5" fill="none" stroke="currentColor" stroke-width="1.2"/></svg>`,
+        },
+        {
+          href: 'standardized-work.html#tskp',
+          label: 'TSKP',
+          icon: `<svg viewBox="0 0 16 16" fill="currentColor" class="nav-icon"><path d="M2 14V8h2.5v6H2zm4.75 0V4h2.5v10h-2.5zm4.75 0V6H14v8h-2.5z"/></svg>`,
+        },
+        {
+          href: 'standardized-work.html#yamazumi',
+          label: 'Yamazumi',
+          icon: `<svg viewBox="0 0 16 16" fill="currentColor" class="nav-icon"><path d="M2 9h3v5H2zM2 5h3v3.2H2z"/><path d="M6.5 7h3v7h-3zM6.5 2h3v4.2h-3z" opacity=".7"/><path d="M11 10h3v4h-3zM11 6h3v3.2h-3z"/><path d="M1 4.5h14" stroke="currentColor" stroke-width="1" stroke-dasharray="1.5 1"/></svg>`,
         },
       ],
     },
@@ -562,6 +608,370 @@ const BPMS = (() => {
     };
   }
 
+  // ── Data Produksi: loader terpusat + cache agregat ──────────────
+  // Dipakai resume.html & pa-dashboard.html. Alur:
+  //   1. Cek versi data di server (3 request kecil).
+  //   2. Versi sama dengan cache localStorage → pakai agregat cache (instan).
+  //   3. Versi beda / force → download semua periode, agregasi single-pass,
+  //      simpan agregat + versi ke localStorage, raw rows ke IndexedDB.
+  //   4. Server mati → pakai cache apa pun yang ada, atau hitung dari IndexedDB.
+
+  // Naikkan angka versi key ini setiap kali LOGIKA agregasi berubah,
+  // agar cache lama otomatis diabaikan (v3: + series & type plate untuk Summary Order)
+  const AGG_CACHE_KEY = 'bpms_agg_cache_v4';
+  const PROD_CAT_MAP  = { D: 'DRY', W: 'WET', U: 'DUC' };
+
+  function prodDB(dbName) {
+    const STORE = 'periods';
+    function open() {
+      return new Promise((resolve, reject) => {
+        const req = indexedDB.open(dbName, 1);
+        req.onupgradeneeded = e => e.target.result.createObjectStore(STORE);
+        req.onsuccess = e => resolve(e.target.result);
+        req.onerror   = e => reject(e.target.error);
+      });
+    }
+    return {
+      async getPeriods() {
+        const db = await open();
+        return new Promise((resolve, reject) => {
+          const req = db.transaction(STORE, 'readonly').objectStore(STORE).getAllKeys();
+          req.onsuccess = e => resolve(e.target.result || []);
+          req.onerror   = e => reject(e.target.error);
+        });
+      },
+      async getData(period) {
+        const db = await open();
+        return new Promise((resolve, reject) => {
+          const req = db.transaction(STORE, 'readonly').objectStore(STORE).get(period);
+          req.onsuccess = e => resolve(e.target.result || []);
+          req.onerror   = e => reject(e.target.error);
+        });
+      },
+      async setData(period, rows) {
+        const db = await open();
+        return new Promise((resolve, reject) => {
+          const req = db.transaction(STORE, 'readwrite').objectStore(STORE).put(rows, period);
+          req.onsuccess = () => resolve(true);
+          req.onerror   = () => reject(req.error);
+        });
+      },
+    };
+  }
+  const ProdInforDB = prodDB('bpms_produksi_infor');
+  const ProdBaanDB  = prodDB('bpms_produksi_baan');
+
+  function prodFindColKey(rowSample, ...patterns) {
+    const keys = Object.keys(rowSample);
+    for (const pat of patterns) {
+      const k = keys.find(k => k.trim().toLowerCase() === pat.toLowerCase());
+      if (k) return k;
+    }
+    for (const pat of patterns) {
+      const k = keys.find(k => k.trim().toLowerCase().includes(pat.toLowerCase()));
+      if (k) return k;
+    }
+    return null;
+  }
+
+  function prodBuildLookupMaps() {
+    const state = _state || {};
+
+    const plateMap = new Map();
+    const plateRows = state.dbPlateInfor || [];
+    if (plateRows.length) {
+      const s    = plateRows[0];
+      const vals = Object.keys(s);
+      const kKey = prodFindColKey(s, 'Item Data Infor', 'ItemDataInfor') || vals[1];
+      const kPnP = prodFindColKey(s, 'PN Plate Positif', 'PN Positif')   || vals[2];
+      const kQtP = prodFindColKey(s, 'Qty Plate Positif', 'Qty Positif') || vals[3];
+      const kPnN = prodFindColKey(s, 'PN Plate Negatif', 'PN Negatif')   || vals[4];
+      const kQtN = prodFindColKey(s, 'Qty Plate Negatif', 'Qty Negatif') || vals[5];
+      plateRows.forEach(row => {
+        const key = String(row[kKey] ?? '').trim();
+        if (!key) return;
+        plateMap.set(key, {
+          pnPos : String(row[kPnP] ?? ''),
+          qtyPos: Number(row[kQtP]) || 0,
+          pnNeg : String(row[kPnN] ?? ''),
+          qtyNeg: Number(row[kQtN]) || 0,
+        });
+      });
+    }
+
+    const typeMap = new Map();
+    const typeRows = state.dbTypePlate || [];
+    if (typeRows.length) {
+      const s     = typeRows[0];
+      const vals  = Object.keys(s);
+      const kCode = prodFindColKey(s, 'Type Plate', 'Code') || vals[2];
+      const kGrid = prodFindColKey(s, 'Grid Process', 'Grid') || vals[3];
+      typeRows.forEach(row => {
+        const key = String(row[kCode] ?? '').trim();
+        if (key) typeMap.set(key, String(row[kGrid] ?? ''));
+      });
+    }
+
+    const puLeMap = new Map();
+    const puLeRows = state.dbPuLe || [];
+    if (puLeRows.length) {
+      const s      = puLeRows[0];
+      const vals   = Object.keys(s);
+      const kPN    = prodFindColKey(s, 'PN Plate Infor', 'PN Plate', 'PN') || vals[2];
+      const kRatio = prodFindColKey(s, 'Qty Pule/Plate (kg)', 'Qty Pule/Plate', 'Qty Pule') || vals[4];
+      puLeRows.forEach(row => {
+        const key = String(row[kPN] ?? '').trim();
+        if (key) puLeMap.set(key, Number(row[kRatio]) || 0);
+      });
+    }
+
+    return { plateMap, typeMap, puLeMap };
+  }
+
+  function prodPuleKey(pn) {
+    return pn.charAt(2) === 'F' ? 'W-UNPL-' + pn.substring(7) : pn;
+  }
+
+  function prodGridFromPN(pn) {
+    if (!pn) return '';
+    const parts = pn.split('-');
+    if (parts.length < 3) return '';
+    const c = parts[2].charAt(0);
+    if (c === 'W') return 'Grid Punching';
+    if (c === 'C' || c === 'D') return 'Grid Casting';
+    return 'Calcium Casting';
+  }
+
+  function prodComputeRow(r, maps) {
+    const { plateMap, typeMap, puLeMap } = maps;
+    const item = r.item || '';
+    const qty  = r.qty  || 0;
+    const code = item.charAt(4);
+    let itemBattery = item;
+    if (item.charAt(0) === 'W') {
+      const c = item.split('');
+      c[0] = 'F'; c[4] = 'W';
+      itemBattery = c.join('');
+    }
+    const codeBattery = itemBattery.substring(2, 19);
+    // Category dari itemBattery (setelah konversi W→F, U→W)
+    const category = PROD_CAT_MAP[itemBattery.charAt(4)] || '';
+    // Battery Type: segmen ke-3 itemBattery (untuk lookup series New JIS)
+    const battType = itemBattery.split('-')[2] || '';
+    const year     = r.trxDate ? String(r.trxDate).slice(-4) : '';
+    const wo       = String(r.orderNo || '').substring(0, 4);
+    const pv    = plateMap.get(codeBattery) || {};
+    const pnPos = pv.pnPos  || '';
+    const qpPos = (pv.qtyPos || 0) * qty;
+    const pnNeg = pv.pnNeg  || '';
+    const qpNeg = (pv.qtyNeg || 0) * qty;
+    // Type plate: MID(PN Plate, 8, 4) — mis. CG87 (juga key lookup Grid Process)
+    const platePos = pnPos.substring(7, 11);
+    const plateNeg = pnNeg.substring(7, 11);
+    const gridPos = typeMap.get(platePos) || prodGridFromPN(pnPos);
+    const gridNeg = typeMap.get(plateNeg) || prodGridFromPN(pnNeg);
+    const qPulePos = Math.round((puLeMap.get(prodPuleKey(pnPos)) || 0) * qpPos);
+    const qPuleNeg = Math.round((puLeMap.get(prodPuleKey(pnNeg)) || 0) * qpNeg);
+    // Form Status: segmen ke-2 PN Plate (FOPL = sudah formation / UNPL = belum)
+    const formStatusPos = pnPos ? (pnPos.split('-')[1] || '') : '';
+    const formStatusNeg = pnNeg ? (pnNeg.split('-')[1] || '') : '';
+    return { wo, code, category, battType, year,
+             gridPos, qpPos, qPulePos, formStatusPos, platePos,
+             gridNeg, qpNeg, qPuleNeg, formStatusNeg, plateNeg };
+  }
+
+  /* Lookup Battery Type → Series (aturan conversion-rules.md):
+     exact → buang padding 'X' → rule type terpanjang yang terkandung → LAINNYA.
+     Butuh window.NEW_JIS_SERIES_DATA (sertakan new_jis_series_data.js di halaman). */
+  function prodSeriesLookup() {
+    const rules = (window.NEW_JIS_SERIES_DATA || [])
+      .map(r => ({ type: String(r.type || '').trim().toUpperCase(), series: String(r.series || '').trim() }))
+      .filter(r => r.type && r.series);
+    const exact = new Map(rules.map(r => [r.type, r.series]));
+    const byLen = rules.slice().sort((a, b) => b.type.length - a.type.length);
+    const cache = new Map();
+    return function seriesOf(battTypeRaw) {
+      const t = String(battTypeRaw || '').trim().toUpperCase();
+      if (!t) return 'LAINNYA';
+      if (cache.has(t)) return cache.get(t);
+      let s = exact.get(t);
+      if (!s && t.endsWith('X')) s = exact.get(t.slice(0, -1));
+      if (!s) {
+        const hit = byLen.find(r => t.includes(r.type));
+        s = hit ? hit.series : '';
+      }
+      s = s || 'LAINNYA';
+      cache.set(t, s);
+      return s;
+    };
+  }
+
+  // Agregasi single-pass: satu loop per sumber data, semua metrik sekaligus
+  function prodAggregate(inforRows, baanRows) {
+    const maps     = prodBuildLookupMaps();
+    const seriesOf = prodSeriesLookup();
+    const years  = {};
+    const series = {};  // series battery → total qty produksi (semua tahun)
+    const plate  = {};  // type plate (mis. CG87) → total qty plate + dan − (semua tahun)
+    // addSeries/addPlate mengisi total semua-tahun DAN breakdown per-tahun (a.series/a.plate) sekaligus,
+    // supaya tab Summary Order bisa difilter per tahun tanpa agregasi ulang.
+    const addSeries = (a, s, q) => {
+      if (!q) return;
+      series[s] = (series[s] || 0) + q;
+      if (a) a.series[s] = (a.series[s] || 0) + q;
+    };
+    const addPlate = (a, tp, q) => {
+      if (!tp || !q) return;
+      plate[tp] = (plate[tp] || 0) + q;
+      if (a) a.plate[tp] = (a.plate[tp] || 0) + q;
+    };
+    const get = y => (years[y] = years[y] || {
+      asm: 0, gcPos: 0, gcNeg: 0, gpPos: 0, gpNeg: 0,
+      bmPos: 0, bmNeg: 0, fmPos: 0, fmNeg: 0,
+      cat: { DRY: 0, WET: 0, DUC: 0 },
+      series: {}, plate: {},
+    });
+
+    for (const r of inforRows) {
+      const g = prodComputeRow(r, maps);
+      if (g.wo !== 'PKAB' && g.wo !== 'PKAS') continue;
+      if (!/^\d{4}$/.test(g.year)) continue;
+      const a = get(g.year);
+      a.asm += Number(r.qty) || 0;
+      if (g.gridPos === 'Grid Casting')  a.gcPos += g.qpPos;
+      if (g.gridNeg === 'Grid Casting')  a.gcNeg += g.qpNeg;
+      if (g.gridPos === 'Grid Punching') a.gpPos += g.qpPos;
+      if (g.gridNeg === 'Grid Punching') a.gpNeg += g.qpNeg;
+      a.bmPos += g.qPulePos || 0;
+      a.bmNeg += g.qPuleNeg || 0;
+      // Formation: plate yang sudah melewati formation (Form Status = FOPL)
+      if (g.formStatusPos === 'FOPL') a.fmPos += g.qpPos;
+      if (g.formStatusNeg === 'FOPL') a.fmNeg += g.qpNeg;
+      if (a.cat[g.category] !== undefined) a.cat[g.category] += Number(r.qty) || 0;
+      // Series battery & type plate (untuk tab Summary Order)
+      addSeries(a, seriesOf(g.battType), Number(r.qty) || 0);
+      addPlate(a, g.platePos, g.qpPos);
+      addPlate(a, g.plateNeg, g.qpNeg);
+    }
+
+    for (const r of baanRows) {
+      const y = String(r.year || '');
+      if (!/^\d{4}$/.test(y)) continue;
+      const a = get(y);
+      a.asm += Number(r.qtyProduksi) || 0;
+      if (r.gridPos === 'Grid Casting')  a.gcPos += Number(r.qpPos) || 0;
+      if (r.gridNeg === 'Grid Casting')  a.gcNeg += Number(r.qpNeg) || 0;
+      if (r.gridPos === 'Grid Punching') a.gpPos += Number(r.qpPos) || 0;
+      if (r.gridNeg === 'Grid Punching') a.gpNeg += Number(r.qpNeg) || 0;
+      a.bmPos += Number(r.qPulePos) || 0;
+      a.bmNeg += Number(r.qPuleNeg) || 0;
+      // Formation: Form Status (+)/(-) = FOPL
+      if (String(r.formStatusPos || '').trim().toUpperCase() === 'FOPL') a.fmPos += Number(r.qpPos) || 0;
+      if (String(r.formStatusNeg || '').trim().toUpperCase() === 'FOPL') a.fmNeg += Number(r.qpNeg) || 0;
+      const cat = String(r.category || '').trim().toUpperCase() || PROD_CAT_MAP[r.code];
+      if (a.cat[cat] !== undefined) a.cat[cat] += Number(r.qtyProduksi) || 0;
+      // Series battery & type plate (untuk tab Summary Order)
+      const bt = r.batteryType || String(r.itemBattery || '').split('-')[2];
+      addSeries(a, seriesOf(bt), Number(r.qtyProduksi) || 0);
+      addPlate(a, String(r.pnPos || '').substring(7, 11), Number(r.qpPos) || 0);
+      addPlate(a, String(r.pnNeg || '').substring(7, 11), Number(r.qpNeg) || 0);
+    }
+
+    return { years, series, plate };
+  }
+
+  async function prodFetchVersion() {
+    const get = async url => {
+      const r = await fetch(url, { cache: 'no-store' });
+      if (!r.ok) throw new Error('server');
+      const j = await r.json();
+      if (!j.ok) throw new Error('bad response');
+      return j;
+    };
+    const [pi, pb, st] = await Promise.all([
+      get('api/produksi-infor.php'),
+      get('api/produksi-baan.php'),
+      get('api/state.php?version=1'),
+    ]);
+    return {
+      version: `${pi.version || ''}|${pb.version || ''}|${st.version || ''}`,
+      inforPeriods: pi.periods || [],
+      baanPeriods:  pb.periods || [],
+    };
+  }
+
+  async function loadProdAggregates(opts = {}) {
+    const force = !!opts.force;
+
+    // 1. Cek versi data di server (murah)
+    let ver = null;
+    try { ver = await prodFetchVersion(); } catch (_) { ver = null; }
+
+    // 2. Cache hit → langsung pakai (tanpa download & hitung ulang)
+    if (ver && !force) {
+      try {
+        const c = JSON.parse(localStorage.getItem(AGG_CACHE_KEY) || 'null');
+        if (c && c.version === ver.version && c.years) {
+          return { years: c.years, series: c.series || {}, plate: c.plate || {},
+                   meta: c.meta || {}, fromCache: true, offline: false };
+        }
+      } catch (_) {}
+    }
+
+    // 3. Server tidak terjangkau → cache apa pun yang ada, atau hitung dari IndexedDB
+    if (!ver) {
+      try {
+        const c = JSON.parse(localStorage.getItem(AGG_CACHE_KEY) || 'null');
+        if (c && c.years) return { years: c.years, series: c.series || {}, plate: c.plate || {},
+                                   meta: c.meta || {}, fromCache: true, offline: true };
+      } catch (_) {}
+      const [ip, bp] = await Promise.all([
+        ProdInforDB.getPeriods().catch(() => []),
+        ProdBaanDB.getPeriods().catch(() => []),
+      ]);
+      const [inforRows, baanRows] = await Promise.all([
+        Promise.all(ip.map(p => ProdInforDB.getData(p).catch(() => []))).then(r => r.flat()),
+        Promise.all(bp.map(p => ProdBaanDB.getData(p).catch(() => []))).then(r => r.flat()),
+      ]);
+      const agg  = prodAggregate(inforRows, baanRows);
+      const meta = { inforCount: inforRows.length, inforPeriods: ip.length,
+                     baanCount: baanRows.length, computedAt: new Date().toISOString() };
+      return { years: agg.years, series: agg.series, plate: agg.plate, meta, fromCache: false, offline: true };
+    }
+
+    // 4. Full load dari server; raw rows di-cache ke IndexedDB sebagai fallback offline
+    const fetchPeriod = async (url, db, p) => {
+      try {
+        const r = await fetch(`${url}?period=${p}`, { cache: 'no-store' });
+        if (r.ok) {
+          const j = await r.json();
+          if (j.ok && Array.isArray(j.data) && j.data.length) {
+            try { await db.setData(p, j.data); } catch (_) {}
+            return j.data;
+          }
+        }
+      } catch (_) {}
+      try {
+        const cached = await db.getData(p);
+        if (cached && cached.length) return cached;
+      } catch (_) {}
+      return [];
+    };
+    const [inforRows, baanRows] = await Promise.all([
+      Promise.all(ver.inforPeriods.map(p => fetchPeriod('api/produksi-infor.php', ProdInforDB, p))).then(r => r.flat()),
+      Promise.all(ver.baanPeriods.map(p => fetchPeriod('api/produksi-baan.php', ProdBaanDB, p))).then(r => r.flat()),
+    ]);
+    const agg  = prodAggregate(inforRows, baanRows);
+    const meta = { inforCount: inforRows.length, inforPeriods: ver.inforPeriods.length,
+                   baanCount: baanRows.length, computedAt: new Date().toISOString() };
+    try {
+      localStorage.setItem(AGG_CACHE_KEY, JSON.stringify({
+        version: ver.version, years: agg.years, series: agg.series, plate: agg.plate, meta,
+      }));
+    } catch (_) {}
+    return { years: agg.years, series: agg.series, plate: agg.plate, meta, fromCache: false, offline: false };
+  }
+
   // ── Number formatting ───────────────────────────────────────────
 
   function fmtNum(n, dec = 1) {
@@ -577,6 +987,7 @@ const BPMS = (() => {
     renderSidebar, renderTopbar, initSidebar, initServerStatus, checkServerStatus,
     toast, showLoading, hideLoading,
     getPeriods, getCurrentPeriod, formatPeriod,
+    loadProdAggregates, buildProdLookupMaps: prodBuildLookupMaps, prodDB,
     parseItemString, findPCSMatches, calcLVC,
     shiftMinutes, getWorkDayCount, getCapacityHours,
     initCalendarForPeriod, initCapacityForPeriod, calcPCSFields,
@@ -597,9 +1008,13 @@ window.addEventListener('DOMContentLoaded', async () => {
   BPMS.initSidebar();
   BPMS.initServerStatus();
 
-  BPMS.showLoading();
-  await BPMS.syncFromServer();
-  BPMS.hideLoading();
+  // Halaman dengan penyimpanan sendiri (mis. Standardized Work) memberi <body data-bpms-sync="off">
+  // supaya tidak perlu menunggu unduhan state FAH yang tidak dipakainya.
+  if (document.body.dataset.bpmsSync !== 'off') {
+    BPMS.showLoading();
+    await BPMS.syncFromServer();
+    BPMS.hideLoading();
+  }
 
   if (typeof pageInit === 'function') pageInit();
 });
